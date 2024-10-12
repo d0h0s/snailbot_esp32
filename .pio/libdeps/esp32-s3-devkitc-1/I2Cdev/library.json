@@ -1,0 +1,28 @@
+{
+    "authors": {
+        "name": "Shundo Kishi",
+        "url": "https://os.mbed.com/users/syundo0730/"
+    },
+    "build": {
+        "builder": "MbedLibBuilder"
+    },
+    "description": "Utilities for i2c data connection. This is ported from https://github.com/jrowberg/i2cdevlib.",
+    "examples": [
+        "https://os.mbed.com/users/syundo0730/code/MPU6050/",
+        "https://os.mbed.com/users/syundo0730/code/MPU9150/",
+        "https://os.mbed.com/users/tsumagari/code/MPU6050/"
+    ],
+    "frameworks": "mbed",
+    "keywords": [
+        "i2c",
+        "mpu6050",
+        "mpu9150"
+    ],
+    "name": "I2Cdev",
+    "platforms": "*",
+    "repository": {
+        "type": "hg",
+        "url": "https://os.mbed.com/users/syundo0730/code/I2Cdev/"
+    },
+    "version": "0.0.0+sha.3aa973ebe3e5"
+}
