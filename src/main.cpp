@@ -36,9 +36,9 @@
 #include "soc/gpio_reg.h"
 #include "driver/gpio.h"
 
-#include <HardwareSerial.h>
+// #include <HardwareSerial.h>
 // #include <SoftwareSerial.h>
-HardwareSerial mySerial(1);
+// HardwareSerial mySerial(2);
 
 // #include <FastLED.h>
 
@@ -257,40 +257,14 @@ void hardware_version_setup(int code)
 
 void setup(void)
 {
-  // uart_config_t uart_config = {
-  //   .baud_rate = 115200,
-  //   .data_bits = UART_DATA_8_BITS,
-  //   .parity = UART_PARITY_DISABLE,
-  //   .stop_bits = UART_STOP_BITS_1,
-  //   .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
-  //   .source_clk = UART_SCLK_APB,
-  // };
-  // uart_driver_install(UART_NUM_2, 1024*2, 0, 0, NULL, 0);
-  // uart_param_config(UART_NUM_2, &uart_config);
-
-  // gpio_matrix_out(19, 17, 0, 0);
-  // gpio_matrix_in(20, 18, 0);
-
-  // gpio_set_direction(GPIO_NUM_19, GPIO_MODE_OUTPUT);
-  // gpio_set_direction(GPIO_NUM_20, GPIO_MODE_INPUT);
-
-  // WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); //disable brownout detectors
   Serial.begin(115200);
   Serial.println("Start setup");
 
-  Serial.println(READ_PERI_REG(GPIO_FUNC19_OUT_SEL_CFG_REG));
-  Serial.println(READ_PERI_REG(GPIO_FUNC20_OUT_SEL_CFG_REG));
-
-  mySerial.begin(115200, SERIAL_8N1, 19, 20);  // 19,20:256,18  20,19:256:18
-
-  Serial.println(READ_PERI_REG(GPIO_FUNC19_OUT_SEL_CFG_REG));
-  Serial.println(READ_PERI_REG(GPIO_FUNC20_OUT_SEL_CFG_REG));
-
-  Serial.println("mySerial begin");
+  Serial2.begin(115200, SERIAL_8N1, PI_RX, PI_TX);  // 19,20:256,18  20,19:256:18
+  // uart_driver_install(UART_NUM_2, 2048, 1024, 0, NULL, 0); // 2048字节接收缓冲区，1024字节发送缓冲区
+  Serial.println("Serial2 begin");
   // while(!Serial);
   // while(!Serial2);
-
-  
 
   EEPROM.begin(80);
 

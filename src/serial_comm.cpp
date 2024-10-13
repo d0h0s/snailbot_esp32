@@ -84,7 +84,7 @@ typedef struct{
 // uint64_t robot_mac;
 // uint8_t robot_mac_[14];
 
-extern HardwareSerial mySerial;
+// extern HardwareSerial mySerial;
 
 extern int lifter1_node_id, lifter2_node_id;
 extern bool lifter1_node_connected, lifter2_node_connected;
@@ -207,7 +207,7 @@ void send() {
 
     send_packet.checksum = check_sum(1, (uint8_t*)&send_packet, sizeof(send_t) - 1);
 
-    mySerial.write((uint8_t*)&send_packet, sizeof(send_t));
+    Serial2.write((uint8_t*)&send_packet, sizeof(send_t));
 }
 
 void test_i2c() {
@@ -240,46 +240,62 @@ void serial_setup(void)
 
 void serial_loop(void)
 {
-    // Serial.println("Start serial loop");
-    // Recv
+    static uint8_t buffer[sizeof(recv_t)];  // 定义静态缓冲区用于存储接收到的数据
+    static int buffer_index = 0;            // 缓冲区索引
+
     recv_t recv_packet;
-    if (mySerial.available() > 0) {
-        Serial.println("mySerial available");
-        memset(serial_cmd_copy, 0, sizeof(serial_cmd_copy));
 
-        size_t len = mySerial.readBytes(serial_cmd_copy, sizeof(serial_cmd_copy) - 1);
-        // mySerial.println("serial_cmd_copy: ");
-        // mySerial.println(serial_cmd_copy);
-        // mySerial.println();
-        serial_cmd_copy[len] = '\0';
+    // 如果串口有可用数据
+    if (Serial2.available() > 0) {
+        Serial.println("Serial2 available");
 
-        if (len > 0) {
-            if (!cmd_parse(serial_cmd_copy)) {
-                ;
+        // 逐字节接收数据
+        while (Serial2.available() > 0) {
+            uint8_t byte = Serial2.read();
+
+            // 找到帧头 0x7A
+            if (buffer_index == 0 && byte == 0x7A) {
+                buffer[buffer_index++] = byte;  // 将帧头存入缓冲区
             }
-            memcpy(&recv_packet, serial_cmd_copy, sizeof(recv_t));
+            else if (buffer_index > 0) {
+                buffer[buffer_index++] = byte;  // 将后续数据存入缓冲区
+
+                // 如果接收到了完整的数据包
+                if (buffer_index == sizeof(recv_t)) {
+                    memcpy(&recv_packet, buffer, sizeof(recv_t));  // 复制数据包
+
+                    // 校验和校验
+                    uint8_t calculated_checksum = check_sum(0, (uint8_t*)&recv_packet, sizeof(recv_t) - 1);
+                    Serial.print("Calculated checksum: 0x");
+                    Serial.println(calculated_checksum, HEX);
+
+                    Serial.print("recv_packet.checksum: 0x");
+                    Serial.println(recv_packet.checksum, HEX);
+
+                    if (recv_packet.checksum == calculated_checksum) {
+                        // 如果校验和正确，打印出接收到的数据
+                        Serial.println("Checksum is correct");
+                        Serial.print("recv_packet.vx:");
+                        Serial.println(recv_packet.vx);
+                        Serial.print("recv_packet.vy:");
+                        Serial.println(recv_packet.vy);
+                        Serial.print("recv_packet.wz:");
+                        Serial.println(recv_packet.wz);        
+
+                        // 调用函数处理接收到的指令
+                        float expect_v_left, expect_v_right;
+                        fd_kinematic(recv_packet.vx, recv_packet.wz, &expect_v_left, &expect_v_right);
+                        strut_controller.set_target_velocity(true, expect_v_left, expect_v_right);
+                    } else {
+                        // 校验和失败
+                        Serial.println("Checksum is incorrect, skipping this packet");
+                    }
+
+                    // 重置缓冲区索引，准备接收下一帧数据
+                    buffer_index = 0;
+                }
+            }
         }
-    }
-
-    send();
-    test_i2c();
-    print_debug();
-
-    // Control
-    dt = (millis() - chassis->last_tick) / 1000.0f;
-    chassis->last_tick = millis();
-
-    // Serial.println("Start imu_solve");
-    imu_solve(chassis, imu);
-    // Serial.println("Start encoder_solve");
-    encoder_solve(chassis, motor_C, motor_F);
-    // Serial.println("Start cmd_control");
-    // cmd_control(chassis, recv_packet);
-
-    if(recv_packet.header == 0x7A && recv_packet.checksum == check_sum(0, (uint8_t*)&recv_packet, sizeof(recv_t) - 1)){
-        float expect_v_left, expect_v_right;
-        fd_kinematic(recv_packet.vx, recv_packet.wz, &expect_v_left, &expect_v_right);
-        strut_controller.set_target_velocity(true, expect_v_left, expect_v_right);
     }
     // float expect_v_left, expect_v_right;
     // fd_kinematic(recv_packet.vx, recv_packet.wz, &expect_v_left, &expect_v_right);
@@ -293,4 +309,6 @@ void serial_loop(void)
     //   //ws.textAll("task_key " + String(task_key));
     // //   mySerial.println("task_key " + String(task_key));
     // }
-}
+
+} 
+

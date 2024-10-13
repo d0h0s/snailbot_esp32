@@ -4,8 +4,8 @@
 #define V_SENSE 6
 #define N_SLEEP 6
 
-// #define PI_RX 19
-// #define PI_TX 20
+#define PI_RX 19
+#define PI_TX 20
 
 // #define AFRC 1
 // #define BFRC 2
