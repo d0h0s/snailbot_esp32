@@ -41,7 +41,7 @@ typedef struct{
 } __attribute__((packed)) send_t;
 
 typedef struct{
-    int8_t header;
+    uint8_t header;
     int16_t vx;
     int16_t vy;
     int16_t wz;
@@ -173,8 +173,8 @@ void encoder_solve(chassis_t* chassis, DC_Motor l_motor, DC_Motor r_motor) {
 }
 
 void fd_kinematic(float v, float wz, float* v_left, float* v_right) {
-    *v_left = (v - (wz * WHEEL_DISTANCE) / 2) * GEAR_RATIO / WHEEL_RADIUS;
-    *v_right = (v + (wz * WHEEL_DISTANCE) / 2) * GEAR_RATIO / WHEEL_RADIUS;
+    *v_left = (v - (wz * WHEEL_DISTANCE) / 2) * GEAR_RATIO / WHEEL_RADIUS / 1000;
+    *v_right = (v + (wz * WHEEL_DISTANCE) / 2) * GEAR_RATIO / WHEEL_RADIUS / 1000;
 }
 
 void bk_kinematic(float v_left, float v_right, float* v, float* wz) {
@@ -228,27 +228,18 @@ void serial_setup(void)
     // chassis
     chassis = (chassis_t*)calloc(1, sizeof(chassis_t));
     chassis->last_tick = millis();
-
-    // send_packet
-    // send_packet = (send_t*)calloc(1, sizeof(send_t));
-    // send_packet.header = 0x7B;
-    // send_packet.flag_stop = 0;
-
-    // recv_packet
-    // recv_packet = (recv_t*)calloc(1, sizeof(recv_t));
+    strut_controller.base2_driver->set_speed_pid(0.1, 0.0, 0.0);
 }
-
 void serial_loop(void)
 {
     static uint8_t buffer[sizeof(recv_t)];  // 定义静态缓冲区用于存储接收到的数据
     static int buffer_index = 0;            // 缓冲区索引
-
+    static int16_t last_vx = 0;  // 保存上次的 vx 值
+    static int16_t last_wz = 0;  // 保存上次的 wz 值
     recv_t recv_packet;
 
     // 如果串口有可用数据
     if (Serial2.available() > 0) {
-        Serial.println("Serial2 available");
-
         // 逐字节接收数据
         while (Serial2.available() > 0) {
             uint8_t byte = Serial2.read();
@@ -266,26 +257,33 @@ void serial_loop(void)
 
                     // 校验和校验
                     uint8_t calculated_checksum = check_sum(0, (uint8_t*)&recv_packet, sizeof(recv_t) - 1);
-                    Serial.print("Calculated checksum: 0x");
-                    Serial.println(calculated_checksum, HEX);
+                    // Serial.print("Calculated checksum: 0x");
+                    // Serial.println(calculated_checksum, HEX);
 
-                    Serial.print("recv_packet.checksum: 0x");
-                    Serial.println(recv_packet.checksum, HEX);
+                    // Serial.print("recv_packet.checksum: 0x");
+                    // Serial.println(recv_packet.checksum, HEX);
 
                     if (recv_packet.checksum == calculated_checksum) {
                         // 如果校验和正确，打印出接收到的数据
-                        Serial.println("Checksum is correct");
-                        Serial.print("recv_packet.vx:");
-                        Serial.println(recv_packet.vx);
-                        Serial.print("recv_packet.vy:");
-                        Serial.println(recv_packet.vy);
-                        Serial.print("recv_packet.wz:");
-                        Serial.println(recv_packet.wz);        
+                        // Serial.println("Checksum is correct");
+                        // Serial.print("recv_packet.vx:");
+                        // Serial.println(recv_packet.vx);
+                        // Serial.print("recv_packet.vy:");
+                        // Serial.println(recv_packet.vy);
+                        // Serial.print("recv_packet.wz:");
+                        // Serial.println(recv_packet.wz);        
 
-                        // 调用函数处理接收到的指令
-                        float expect_v_left, expect_v_right;
-                        fd_kinematic(recv_packet.vx, recv_packet.wz, &expect_v_left, &expect_v_right);
-                        strut_controller.set_target_velocity(true, expect_v_left, expect_v_right);
+                        if (recv_packet.vx != last_vx || recv_packet.wz != last_wz) 
+                        {
+                            // 调用函数处理接收到的指令
+                            float expect_v_left, expect_v_right;
+                            // fd_kinematic(recv_packet.vx, recv_packet.wz, &expect_v_left, &expect_v_right);
+                            strut_controller.set_target_velocity(true, recv_packet.vx, recv_packet.wz, millis());
+                            // 更新上次的速度指令
+                            last_vx = recv_packet.vx;
+                            last_wz = recv_packet.wz;
+                        }
+
                     } else {
                         // 校验和失败
                         Serial.println("Checksum is incorrect, skipping this packet");
@@ -297,18 +295,5 @@ void serial_loop(void)
             }
         }
     }
-    // float expect_v_left, expect_v_right;
-    // fd_kinematic(recv_packet.vx, recv_packet.wz, &expect_v_left, &expect_v_right);
-    // strut_controller.set_target_velocity(true, expect_v_left, expect_v_right);
-
-    // Serial.println("Done control");
-
-    // uint32_t task_key;
-    // if( xQueueReceive( xSendKeyQueue, &( task_key ), ( TickType_t ) 0 ) )
-    // { 
-    //   //ws.textAll("task_key " + String(task_key));
-    // //   mySerial.println("task_key " + String(task_key));
-    // }
-
 } 
 

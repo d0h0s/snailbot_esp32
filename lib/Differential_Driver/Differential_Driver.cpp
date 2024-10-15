@@ -4,7 +4,9 @@
 #include <EEPROM.h>
 
 #define MAX_SPEED 2.25
-
+#define GEAR_RATIO 1600
+#define WHEEL_RADIUS 0.02
+#define WHEEL_DISTANCE 0.08075
 
 DifferentialDriver::DifferentialDriver(DC_Motor* motor_l_, ESP32Encoder* encoder_l_, DC_Motor* motor_r_, ESP32Encoder* encoder_r_, uint32_t eeprom_offset_)
 :velocity_l_pid(&motor_l_real_speed, &motor_l_pwm, &motor_l_target_speed, 0.2, 3., 0, DIRECT),
@@ -85,8 +87,10 @@ void DifferentialDriver::speed_linear_leading(double linear, double angular)
 void DifferentialDriver::speed_raw(double linear, double angular)
 {
   // the input should be safe (less than MAX_SPEED), through unsafe is ok
-  motor_l_target_speed = linear - angular;
-  motor_r_target_speed = -(linear + angular);
+  // motor_l_target_speed = linear - angular;
+  // motor_r_target_speed = -(linear + angular);
+  motor_l_target_speed = (linear - (-angular * WHEEL_DISTANCE) / 2) * GEAR_RATIO / WHEEL_RADIUS / 1000;
+  motor_r_target_speed = (linear + (-angular * WHEEL_DISTANCE) / 2) * GEAR_RATIO / WHEEL_RADIUS / 1000;
 }
 
 // manually set pwm
