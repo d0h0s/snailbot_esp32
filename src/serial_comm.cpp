@@ -37,6 +37,9 @@ typedef struct{
     int16_t wx;
     int16_t wy;
     int16_t wz;
+    int16_t roll;
+    int16_t pitch;
+    int16_t yaw;
     uint8_t checksum;
 } __attribute__((packed)) send_t;
 
@@ -139,13 +142,13 @@ unsigned char check_sum(unsigned char Mode, uint8_t* data, size_t len) {
 }
 
 void imu_solve(chassis_t* chassis, MPU6050_Filter imu) {
-    chassis->ax = imu.accX;
-    chassis->ay = imu.accY;
-    chassis->az = imu.accZ;
+    chassis->ax = imu.accX * 1000;
+    chassis->ay = imu.accY * 1000;
+    chassis->az = imu.accZ * 1000;
 
-    chassis->wx = imu.gyroXrate;
-    chassis->wy = imu.gyroYrate;
-    chassis->wz = imu.gyroZrate;
+    chassis->wx = imu.gyroXrate * 1000;
+    chassis->wy = imu.gyroYrate * 1000;
+    chassis->wz = imu.gyroZrate * 1000;
 
     float w = imu.q[0];
     float x = imu.q[1];
@@ -164,9 +167,9 @@ void imu_solve(chassis_t* chassis, MPU6050_Filter imu) {
     chassis->z += chassis->vz * dt;
 }
 
-void encoder_solve(chassis_t* chassis, DC_Motor l_motor, DC_Motor r_motor) {
-    chassis->v_left = l_motor.get_speed();
-    chassis->v_right = r_motor.get_speed();
+void encoder_solve(chassis_t* chassis, double motor_l_real_speed, double motor_r_real_speed) {
+    chassis->v_left = motor_l_real_speed;
+    chassis->v_right = motor_r_real_speed;
 
     chassis->s_left += chassis->v_left * dt;
     chassis->s_right += chassis->v_right * dt;
@@ -203,6 +206,9 @@ void send() {
     send_packet.wx = (int16_t)chassis->wx;
     send_packet.wy = (int16_t)chassis->wy;
     send_packet.wz = (int16_t)chassis->wz;
+    send_packet.roll = (int16_t)chassis->roll;
+    send_packet.pitch = (int16_t)chassis->pitch;
+    send_packet.yaw = (int16_t)chassis->yaw;
     // Serial.println("Initialized send_packet");
 
     send_packet.checksum = check_sum(1, (uint8_t*)&send_packet, sizeof(send_t) - 1);
@@ -224,11 +230,10 @@ void serial_setup(void)
 {
     Serial.println("Start serial setup");
     // start_calibrate_imu = true;
-
     // chassis
     chassis = (chassis_t*)calloc(1, sizeof(chassis_t));
     chassis->last_tick = millis();
-    strut_controller.base2_driver->set_speed_pid(0.1, 0.0, 0.0);
+    strut_controller.base2_driver->set_speed_pid(0.15, 0.0, 0.0);
 }
 void serial_loop(void)
 {
@@ -295,5 +300,8 @@ void serial_loop(void)
             }
         }
     }
+    encoder_solve(chassis, strut_controller.base2_driver->motor_l_real_speed, strut_controller.base2_driver->motor_l_real_speed);
+    imu_solve(chassis, imu);
+    send();
 } 
 

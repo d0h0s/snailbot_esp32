@@ -4,9 +4,7 @@
 #include <EEPROM.h>
 
 #define MAX_SPEED 2.25
-#define GEAR_RATIO 1600
-#define WHEEL_RADIUS 0.02
-#define WHEEL_DISTANCE 0.08075
+
 
 DifferentialDriver::DifferentialDriver(DC_Motor* motor_l_, ESP32Encoder* encoder_l_, DC_Motor* motor_r_, ESP32Encoder* encoder_r_, uint32_t eeprom_offset_)
 :velocity_l_pid(&motor_l_real_speed, &motor_l_pwm, &motor_l_target_speed, 0.2, 3., 0, DIRECT),
@@ -87,10 +85,10 @@ void DifferentialDriver::speed_linear_leading(double linear, double angular)
 void DifferentialDriver::speed_raw(double linear, double angular)
 {
   // the input should be safe (less than MAX_SPEED), through unsafe is ok
-  // motor_l_target_speed = linear - angular;
-  // motor_r_target_speed = -(linear + angular);
-  motor_l_target_speed = (linear - (-angular * WHEEL_DISTANCE) / 2) * GEAR_RATIO / WHEEL_RADIUS / 1000;
-  motor_r_target_speed = (linear + (-angular * WHEEL_DISTANCE) / 2) * GEAR_RATIO / WHEEL_RADIUS / 1000;
+  motor_l_target_speed = (linear + (angular * WHEEL_DISTANCE)/2);
+  motor_r_target_speed = -(linear - (angular * WHEEL_DISTANCE)/2);
+  // motor_l_target_speed = (-linear - (-angular * WHEEL_DISTANCE) / 2) * GEAR_RATIO / WHEEL_RADIUS / 1000;
+  // motor_r_target_speed = (linear + (-angular * WHEEL_DISTANCE) / 2) * GEAR_RATIO / WHEEL_RADIUS / 1000;
 }
 
 // manually set pwm
@@ -111,12 +109,23 @@ void DifferentialDriver::loop(void)
 {
   unsigned long dt_us = (unsigned long) (micros() - timer);
   double dt = (double)(dt_us) / 1000000.; // Calculate delta time
-  motor_l_real_speed = ((double) (encoder_l->getCount() - encoder_l_last_count)) * MOTOR_RATIO_RAD / dt;
-  motor_r_real_speed = ((double) (encoder_r->getCount() - encoder_r_last_count)) * MOTOR_RATIO_RAD / dt;
-  
+  motor_l_real_speed = -((double) (encoder_l->getCount() - encoder_l_last_count)) * MOTOR_RATIO_RAD / dt;
+  motor_r_real_speed = -((double) (encoder_r->getCount() - encoder_r_last_count)) * MOTOR_RATIO_RAD / dt;
+  // Serial.println("loop");
+  // Serial.print(">motor_l_real_speed:");
+  // Serial.println(motor_l_real_speed);
+  // Serial.print(">motor_l_target_speed:");
+  // Serial.println(motor_l_target_speed);
+  // Serial.print(">motor_r_real_speed:");
+  // Serial.println(motor_r_real_speed);
+  // Serial.print(">motor_r_target_speed:");
+  // Serial.println(motor_r_target_speed);
   velocity_l_pid.Compute();
   velocity_r_pid.Compute();
-  
+  // Serial.print(">motor_l_pwm:");
+  // Serial.println(motor_l_pwm);
+  // Serial.print(">motor_r_pwm:");
+  // Serial.println(motor_r_pwm);
   if (abs(motor_l_pwm) < BASE_MOTOR_INVALID_AMP) motor_l_pwm = 0.;
   if (abs(motor_r_pwm) < BASE_MOTOR_INVALID_AMP) motor_r_pwm = 0.;
 

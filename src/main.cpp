@@ -258,7 +258,7 @@ void setup(void)
 {
   Serial.begin(115200);
   Serial.println("Start setup");
-
+  Serial.println("setup");
   Serial2.begin(115200, SERIAL_8N1, PI_RX, PI_TX);  // 19,20:256,18  20,19:256:18
   // uart_driver_install(UART_NUM_2, 2048, 1024, 0, NULL, 0); // 2048字节接收缓冲区，1024字节发送缓冲区
   Serial.println("Serial2 begin");
