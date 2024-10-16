@@ -25,6 +25,8 @@
 
 #include "DC_Motor.h"
 
+#include "Linear_Filter.h"
+
 typedef struct{
     uint8_t header;
     uint8_t flag_stop;
@@ -37,14 +39,11 @@ typedef struct{
     int16_t wx;
     int16_t wy;
     int16_t wz;
-    int16_t roll;
-    int16_t pitch;
-    int16_t yaw;
     uint8_t checksum;
 } __attribute__((packed)) send_t;
 
 typedef struct{
-    uint8_t header;
+    int8_t header;
     int16_t vx;
     int16_t vy;
     int16_t wz;
@@ -64,6 +63,10 @@ typedef struct{
     float ay;
     float az;
 
+    float ax_raw;
+    float ay_raw;
+    float az_raw;
+
     float roll;
     float pitch;
     float yaw;
@@ -78,7 +81,12 @@ typedef struct{
     float v_left;
     float v_right;
 
-    float last_tick;
+    // float imu_last_tick;
+    float encoder_last_tick;
+
+    // float ax_offset;
+    // float ay_offset;
+    // float az_offset;
 } chassis_t;
 
 // extern byte MAJOR_CODE, MINOR_CODE;
@@ -141,14 +149,30 @@ unsigned char check_sum(unsigned char Mode, uint8_t* data, size_t len) {
     return sum;
 }
 
-void imu_solve(chassis_t* chassis, MPU6050_Filter imu) {
-    chassis->ax = imu.accX * 1000;
-    chassis->ay = imu.accY * 1000;
-    chassis->az = imu.accZ * 1000;
+Linear_Filter linear_filter;
 
-    chassis->wx = imu.gyroXrate * 1000;
-    chassis->wy = imu.gyroYrate * 1000;
-    chassis->wz = imu.gyroZrate * 1000;
+void imu_solve(chassis_t* chassis, MPU6050_Filter imu) {
+    linear_filter.loop();
+
+    // chassis->ax = imu.accX - chassis->ax_offset;
+    // chassis->ay = imu.accY - chassis->ay_offset;
+    // chassis->az = imu.accZ - chassis->az_offset;
+
+    chassis->ax = linear_filter.accX;
+    chassis->ay = linear_filter.accY;
+    chassis->az = linear_filter.accZ;
+
+    chassis->vx = linear_filter.velX;
+    chassis->vy = linear_filter.velY;
+    chassis->vz = linear_filter.velZ;
+
+    chassis->x = linear_filter.posX;
+    chassis->y = linear_filter.posY;
+    chassis->z = linear_filter.posZ;
+
+    chassis->wx = imu.gyroXrate;
+    chassis->wy = imu.gyroYrate;
+    chassis->wz = imu.gyroZrate;
 
     float w = imu.q[0];
     float x = imu.q[1];
@@ -158,21 +182,29 @@ void imu_solve(chassis_t* chassis, MPU6050_Filter imu) {
     chassis->pitch = asin(2.0f * (w * z - y * x));
     chassis->yaw = atan2(2.0f * (w * x + y * z), 1.0f - 2.0f * (z * z + x * x));
 
-    chassis->vx += chassis->ax * dt;
-    chassis->vy += chassis->ay * dt;
-    chassis->vz += chassis->az * dt;
+    // float dt = (micros() - chassis->imu_last_tick) / 1000000.0f;
 
-    chassis->x += chassis->vx * dt;
-    chassis->y += chassis->vy * dt;
-    chassis->z += chassis->vz * dt;
+    // chassis->vx += chassis->ax * dt;
+    // chassis->vy += chassis->ay * dt;
+    // chassis->vz += chassis->az * dt;
+
+    // chassis->x += chassis->vx * dt;
+    // chassis->y += chassis->vy * dt;
+    // chassis->z += chassis->vz * dt;
+
+    // chassis->imu_last_tick = micros();
 }
 
-void encoder_solve(chassis_t* chassis, double motor_l_real_speed, double motor_r_real_speed) {
-    chassis->v_left = motor_l_real_speed;
-    chassis->v_right = motor_r_real_speed;
+void encoder_solve(chassis_t* chassis, DC_Motor l_motor, DC_Motor r_motor) {
+    chassis->v_left = l_motor.get_speed();
+    chassis->v_right = r_motor.get_speed();
+
+    float dt = (micros() - chassis->encoder_last_tick) / 1000000.0f;
 
     chassis->s_left += chassis->v_left * dt;
     chassis->s_right += chassis->v_right * dt;
+
+    chassis->encoder_last_tick = micros();
 }
 
 void fd_kinematic(float v, float wz, float* v_left, float* v_right) {
@@ -180,10 +212,10 @@ void fd_kinematic(float v, float wz, float* v_left, float* v_right) {
     *v_right = (v + (wz * WHEEL_DISTANCE) / 2) * GEAR_RATIO / WHEEL_RADIUS / 1000;
 }
 
-void bk_kinematic(float v_left, float v_right, float* v, float* wz) {
-    *v = (v_left + v_right) / 2;
-    *wz = (v_right - v_left) / WHEEL_DISTANCE;
-}
+// void bk_kinematic(float v_left, float v_right, float* v, float* wz) {
+//     *v = (v_left + v_right) / 2;
+//     *wz = (v_right - v_left) / WHEEL_DISTANCE;
+// }
 
 // void cmd_control(chassis_t* chassis, recv_t* recv_packet) {
 //     float expect_v_left, expect_v_right;
@@ -197,18 +229,15 @@ void send() {
     send_t send_packet;
     send_packet.header = 0x7B;
     send_packet.flag_stop = 0;
-    send_packet.vx = (int16_t)chassis->vx;
-    send_packet.vy = (int16_t)chassis->vy;
-    send_packet.vz = (int16_t)chassis->vz;
-    send_packet.ax = (int16_t)chassis->ax;
-    send_packet.ay = (int16_t)chassis->ay;
-    send_packet.az = (int16_t)chassis->az;
-    send_packet.wx = (int16_t)chassis->wx;
-    send_packet.wy = (int16_t)chassis->wy;
-    send_packet.wz = (int16_t)chassis->wz;
-    send_packet.roll = (int16_t)chassis->roll;
-    send_packet.pitch = (int16_t)chassis->pitch;
-    send_packet.yaw = (int16_t)chassis->yaw;
+    send_packet.vx = (int16_t)(1000 * chassis->vx);
+    send_packet.vy = (int16_t)(1000 * chassis->vy);
+    send_packet.vz = (int16_t)(1000 * chassis->vz);
+    send_packet.ax = (int16_t)(1000 * chassis->ax);
+    send_packet.ay = (int16_t)(1000 * chassis->ay);
+    send_packet.az = (int16_t)(1000 * chassis->az);
+    send_packet.wx = (int16_t)(1000 * chassis->wx);
+    send_packet.wy = (int16_t)(1000 * chassis->wy);
+    send_packet.wz = (int16_t)(1000 * chassis->wz);
     // Serial.println("Initialized send_packet");
 
     send_packet.checksum = check_sum(1, (uint8_t*)&send_packet, sizeof(send_t) - 1);
@@ -216,35 +245,64 @@ void send() {
     Serial2.write((uint8_t*)&send_packet, sizeof(send_t));
 }
 
-void test_i2c() {
-    ;
-}
-
 void print_debug() {
     // imu
     // Serial.println("Acc: " + String(imu.accX) + ", " + String(imu.accY) + ", " + String(imu.accZ));
     // Serial.println("Gyro: " + String(imu.gyroXrate) + ", " + String(imu.gyroYrate) + ", " + String(imu.gyroZrate));
+
+    Serial.println("loop");
+
+    // Serial.println(">vx:" + String(chassis->vx));
+    // Serial.println(">vy:" + String(chassis->vy));
+    // Serial.println(">vz:" + String(chassis->vz));
+
+    // Serial.println(">roll:" + String(chassis->roll));
+    // Serial.println(">pitch:" + String(chassis->pitch));
+    // Serial.println(">yaw:" + String(chassis->yaw));
+
+    Serial.println(">v_left:" + String(chassis->v_left));
+    Serial.println(">v_right:" + String(chassis->v_right));
 }
 
 void serial_setup(void)
 {
-    Serial.println("Start serial setup");
+    Serial.println("setup");
     // start_calibrate_imu = true;
+
     // chassis
     chassis = (chassis_t*)calloc(1, sizeof(chassis_t));
-    chassis->last_tick = millis();
-    strut_controller.base2_driver->set_speed_pid(0.15, 0.0, 0.0);
+    // chassis->imu_last_tick = millis();
+    chassis->encoder_last_tick = millis();
+
+    // send_packet
+    // send_packet = (send_t*)calloc(1, sizeof(send_t));
+    // send_packet.header = 0x7B;
+    // send_packet.flag_stop = 0;
+
+    // recv_packet
+    // recv_packet = (recv_t*)calloc(1, sizeof(recv_t));
+
+    base2_driver.set_speed_pid(0.01, 0, 0);
+
+    // while(!imu.accX);
+    linear_filter.init();
 }
+
 void serial_loop(void)
 {
     static uint8_t buffer[sizeof(recv_t)];  // 定义静态缓冲区用于存储接收到的数据
     static int buffer_index = 0;            // 缓冲区索引
-    static int16_t last_vx = 0;  // 保存上次的 vx 值
-    static int16_t last_wz = 0;  // 保存上次的 wz 值
+
     recv_t recv_packet;
+
+    imu_solve(chassis, imu);
+    encoder_solve(chassis, motor_C, motor_F);
+    print_debug();
 
     // 如果串口有可用数据
     if (Serial2.available() > 0) {
+        Serial.println("Serial2 available");
+
         // 逐字节接收数据
         while (Serial2.available() > 0) {
             uint8_t byte = Serial2.read();
@@ -262,33 +320,26 @@ void serial_loop(void)
 
                     // 校验和校验
                     uint8_t calculated_checksum = check_sum(0, (uint8_t*)&recv_packet, sizeof(recv_t) - 1);
-                    // Serial.print("Calculated checksum: 0x");
-                    // Serial.println(calculated_checksum, HEX);
+                    Serial.print("Calculated checksum: 0x");
+                    Serial.println(calculated_checksum, HEX);
 
-                    // Serial.print("recv_packet.checksum: 0x");
-                    // Serial.println(recv_packet.checksum, HEX);
+                    Serial.print("recv_packet.checksum: 0x");
+                    Serial.println(recv_packet.checksum, HEX);
 
                     if (recv_packet.checksum == calculated_checksum) {
                         // 如果校验和正确，打印出接收到的数据
-                        // Serial.println("Checksum is correct");
-                        // Serial.print("recv_packet.vx:");
-                        // Serial.println(recv_packet.vx);
-                        // Serial.print("recv_packet.vy:");
-                        // Serial.println(recv_packet.vy);
-                        // Serial.print("recv_packet.wz:");
-                        // Serial.println(recv_packet.wz);        
+                        Serial.println("Checksum is correct");
+                        Serial.print("recv_packet.vx:");
+                        Serial.println(recv_packet.vx);
+                        Serial.print("recv_packet.vy:");
+                        Serial.println(recv_packet.vy);
+                        Serial.print("recv_packet.wz:");
+                        Serial.println(recv_packet.wz);        
 
-                        if (recv_packet.vx != last_vx || recv_packet.wz != last_wz) 
-                        {
-                            // 调用函数处理接收到的指令
-                            float expect_v_left, expect_v_right;
-                            // fd_kinematic(recv_packet.vx, recv_packet.wz, &expect_v_left, &expect_v_right);
-                            strut_controller.set_target_velocity(true, recv_packet.vx, recv_packet.wz, millis());
-                            // 更新上次的速度指令
-                            last_vx = recv_packet.vx;
-                            last_wz = recv_packet.wz;
-                        }
-
+                        // 调用函数处理接收到的指令
+                        float expect_v_left, expect_v_right;
+                        fd_kinematic(recv_packet.vx, recv_packet.wz, &expect_v_left, &expect_v_right);
+                        strut_controller.set_target_velocity(true, expect_v_left, expect_v_right);
                     } else {
                         // 校验和失败
                         Serial.println("Checksum is incorrect, skipping this packet");
@@ -300,8 +351,19 @@ void serial_loop(void)
             }
         }
     }
-    encoder_solve(chassis, strut_controller.base2_driver->motor_l_real_speed, strut_controller.base2_driver->motor_l_real_speed);
-    imu_solve(chassis, imu);
-    send();
+
+    // float expect_v_left, expect_v_right;
+    // fd_kinematic(recv_packet.vx, recv_packet.wz, &expect_v_left, &expect_v_right);
+    // strut_controller.set_target_velocity(true, expect_v_left, expect_v_right);
+
+    // Serial.println("Done control");
+
+    // uint32_t task_key;
+    // if( xQueueReceive( xSendKeyQueue, &( task_key ), ( TickType_t ) 0 ) )
+    // { 
+    //   //ws.textAll("task_key " + String(task_key));
+    // //   mySerial.println("task_key " + String(task_key));
+    // }
+
 } 
 

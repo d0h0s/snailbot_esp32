@@ -12,11 +12,8 @@
 
 #define BASE_MOTOR_INVALID_AMP 0.1
 
-// #define MOTOR_RATIO_RAD (2.f * PI / 1260.f / 14.f)
-#define MOTOR_RATIO_RAD (2.f * PI / 7000.f / 1.6f)
-#define GEAR_RATIO 1600
-#define WHEEL_RADIUS 0.02
-#define WHEEL_DISTANCE 0.08075
+#define MOTOR_RATIO_RAD (2.f * PI / 1260.f / 14.f)
+
 #define INSPECT_OK_CODE (49 << 2)
 
 class DifferentialDriver
@@ -32,7 +29,8 @@ class DifferentialDriver
     PID velocity_l_pid, velocity_r_pid;
     PID orientation_pid, position_pid;
 
-
+    double motor_l_real_speed, motor_l_pwm, motor_l_target_speed = 0.;
+    double motor_r_real_speed, motor_r_pwm, motor_r_target_speed = 0.;
     double orientation_error, expected_angular_speed, orientation_setpoint = 0.; // orientation_setpoint is always zero
     double position_error, expected_linear_speed, position_setpoint = 0.; // position_setpoint is always zero
 
@@ -63,8 +61,7 @@ class DifferentialDriver
     uint8_t inspect(void);
 
     size_t copy_debug_data(byte* addr);
-    double motor_l_real_speed, motor_l_pwm, motor_l_target_speed = 0.;
-    double motor_r_real_speed, motor_r_pwm, motor_r_target_speed = 0.;
+
 };
   
 #endif

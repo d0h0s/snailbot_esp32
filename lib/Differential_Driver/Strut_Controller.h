@@ -47,7 +47,7 @@ struct ControlState {
 class StrutController
 { 
   private:
-
+    DifferentialDriver *base2_driver;
     MPU6050_Filter* orientation_filter;
 
     QueueHandle_t* send_key_queue;
@@ -73,7 +73,7 @@ class StrutController
     
   public:
     StrutController(DifferentialDriver*, MPU6050_Filter*, QueueHandle_t*);
-    DifferentialDriver *base2_driver;
+    
     void loop(void);
     void pwm(bool, float, float);
     void set_target_position(bool, enum ControllerMode, float, float, float, bool, bool, bool, bool, bool, float, uint32_t=0);   

@@ -160,9 +160,9 @@ bool StrutController::check_stop(ControlState* state)
 
 void StrutController::loop(void)
 {
-
     //try_fetch_new_task(&base1_state);
     try_fetch_new_task(&base2_state);
+
     //base_loop(&base1_state);
     base_loop(&base2_state);
     
@@ -511,23 +511,6 @@ bool StrutController::try_fetch_new_task(ControlState* state)
     ControlParam* param = param_queue->front();
 
     // change task target | assume that the tasks are same if the key is same | may also check source
-    // Serial.print("param->mode:");
-    // Serial.println(param->mode);
-    // Serial.print("param_task_key:");
-    // Serial.println(param->task_key);
-    // Serial.print("param_target_position_x:");
-    // Serial.println(param->target_position_x);   
-    // Serial.print("param_target_position_y:");
-    // Serial.println(param->target_position_y);
-
-    // Serial.print("state->mode:");
-    // Serial.println(state->mode);
-    // Serial.print("state_task_key:");
-    // Serial.println(state->param->task_key);
-    // Serial.print("state_target_position_x:");
-    // Serial.println(state->param->target_position_x);
-    // Serial.print("state_target_position_y:");
-    // Serial.println(state->param->target_position_y);
     if ((param->task_key != 0) && (param->task_key == state->param->task_key) && (param->mode == state->mode))
     {
         reset_state(state, param);
@@ -535,22 +518,15 @@ bool StrutController::try_fetch_new_task(ControlState* state)
         return true;
     }
 
-    // if (!state->reach_target) return false;
+    if (!state->reach_target) return false;
     
     uint8_t resource_occupied = base2_state.resource;
-    // if (param->resource & resource_occupied) return false;
-    // Serial.println("exe next task222");
+    if (param->resource & resource_occupied) return false;
+
     // load new task param
     reset_state(state, param);
     switch_mode(state, param->mode);
-    // Serial.print("cur->mode:");
-    // Serial.println(state->mode);
-    // Serial.print("cur_task_key:");
-    // Serial.println(state->param->task_key);
-    // Serial.print("cur_target_position_x:");
-    // Serial.println(state->param->target_position_x);
-    // Serial.print("cur_target_position_y:");
-    // Serial.println(state->param->target_position_y);
+
     param_queue->pop();
     return true;
 }
