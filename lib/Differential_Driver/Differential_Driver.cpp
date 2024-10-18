@@ -141,7 +141,7 @@ void DifferentialDriver::loop(void)
   if (motor_r_inverted) motor_r->speed(-motor_r_pwm);
   else motor_r->speed(motor_r_pwm);
   motor_l->loop();
-  // motor_r->loop();
+  motor_r->loop();
   
   timer = micros();
   encoder_l_last_count = encoder_l->getCount();

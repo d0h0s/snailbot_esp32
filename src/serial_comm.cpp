@@ -41,8 +41,8 @@ typedef struct{
     int16_t roll;
     int16_t pitch;
     int16_t yaw;
-    int16_t posX;
-    int16_t posY;
+    // int16_t posX;
+    // int16_t posY;
     uint8_t checksum;
 } __attribute__((packed)) send_t;
 
@@ -83,6 +83,9 @@ typedef struct{
 
     float v_left_filtered;
     float v_right_filtered;
+
+    float posX;
+    float posY;
 
     float last_tick;
 } chassis_t;
@@ -202,6 +205,10 @@ void encoder_solve(chassis_t* chassis, double motor_l_real_speed, double motor_r
     chassis->s_right += chassis->v_right_filtered * dt;
 
     bk_kinematic(chassis->v_left_filtered, chassis->v_right_filtered, &chassis->vx, &chassis->wz);
+    Serial.println(">v_left_filtered:" + String(chassis->v_left_filtered));
+    Serial.println(">v_right_filtered:" + String(chassis->v_right_filtered));
+    Serial.println(">solved_vx:" + String(chassis->vx));
+    Serial.println(">solved_wz:" + String(chassis->wz));
     chassis->posX += chassis->vx * cos(chassis->yaw) * dt;
     chassis->posY += chassis->vx * sin(chassis->yaw) * dt;
 
@@ -232,8 +239,8 @@ void send() {
     send_packet.roll = (int16_t)chassis->roll;
     send_packet.pitch = (int16_t)chassis->pitch;
     send_packet.yaw = (int16_t)chassis->yaw;
-    send_packet.posX = (int16_t)chassis->x;
-    send_packet.posY = (int16_t)chassis->y;
+    // send_packet.posX = (int16_t)chassis->x;
+    // send_packet.posY = (int16_t)chassis->y;
     // Serial.println("Initialized send_packet");
 
     send_packet.checksum = check_sum(1, (uint8_t*)&send_packet, sizeof(send_t) - 1);
@@ -253,8 +260,10 @@ void print_debug() {
     Serial.println("loop");
     // Serial.println(">v_left:" + String(chassis->v_left));
     // Serial.println(">v_right:" + String(chassis->v_right));
-    Serial.println(">v_left_filtered:" + String(chassis->v_left_filtered));
-    Serial.println(">v_right_filtered:" + String(chassis->v_right_filtered));
+    // Serial.println(">v_left_filtered:" + String(chassis->v_left_filtered));
+    // Serial.println(">v_right_filtered:" + String(chassis->v_right_filtered));
+    Serial.println(">posX:" + String(chassis->posX));
+    Serial.println(">posY:" + String(chassis->posY));
 }
 
 void serial_setup(void)
@@ -301,8 +310,8 @@ void serial_loop(void)
 
                     if (recv_packet.checksum == calculated_checksum) {
                         // 如果校验和正确，打印出接收到的数据
-                        Serial.println(">vx:" + String(recv_packet.vx));
-                        Serial.println(">wz:" + String(recv_packet.wz));
+                        // Serial.println(">vx:" + String(recv_packet.vx));
+                        // Serial.println(">wz:" + String(recv_packet.wz));
                         // Serial.println("Checksum is correct");
                         // Serial.print("recv_packet.vx:");
                         // Serial.println(recv_packet.vx);
