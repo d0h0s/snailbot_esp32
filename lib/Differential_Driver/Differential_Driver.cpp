@@ -126,8 +126,15 @@ void DifferentialDriver::loop(void)
   // Serial.println(motor_l_pwm);
   // Serial.print(">motor_r_pwm:");
   // Serial.println(motor_r_pwm);
+
+  // motor_l_pwm += last_l_pwm;
+  // motor_r_pwm += last_r_pwm;
+
   if (abs(motor_l_pwm) < BASE_MOTOR_INVALID_AMP) motor_l_pwm = 0.;
-  if (abs(motor_r_pwm) < BASE_MOTOR_INVALID_AMP) motor_r_pwm = 0.;
+  if (abs(motor_r_pwm) < BASE_MOTOR_INVALID_AMP) motor_r_pwm = 0.;  
+
+  // last_l_pwm = motor_l_pwm;
+  // last_r_pwm = motor_r_pwm;
 
   if (motor_l_inverted) motor_l->speed(-motor_l_pwm);
   else motor_l->speed(motor_l_pwm);

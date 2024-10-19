@@ -45,7 +45,7 @@ float Kalman::predict(float newDelta, float dt)
     P += dt * Q_angle;
 
     // make angle belongs to [-PI, PI]
-    limit_angle_2pi(&angle);
+    // limit_angle_2pi(&angle);
 
     return angle;
 }
@@ -64,7 +64,7 @@ float Kalman::update(float newAngle, float R_measure)
     /* Step 3 */
     float y = newAngle - angle; // Angle difference
 
-    limit_angle_2pi(&y);
+    // limit_angle_2pi(&y);
 
     /* Step 6 */
     angle += K * y;
@@ -75,7 +75,7 @@ float Kalman::update(float newAngle, float R_measure)
     P *= 1 - K;
 
     // make angle belongs to [-PI, PI]
-    limit_angle_2pi(&angle);
+    // limit_angle_2pi(&angle);
     
     return angle;
 }

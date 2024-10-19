@@ -24,6 +24,7 @@
 #include "Strut_Controller.h"
 
 #include "DC_Motor.h"
+#include "SlidingWindowFilter.h"
 
 typedef struct{
     uint8_t header;
@@ -40,6 +41,8 @@ typedef struct{
     int16_t roll;
     int16_t pitch;
     int16_t yaw;
+    // int16_t posX;
+    // int16_t posY;
     uint8_t checksum;
 } __attribute__((packed)) send_t;
 
@@ -77,6 +80,12 @@ typedef struct{
 
     float v_left;
     float v_right;
+
+    float v_left_filtered;
+    float v_right_filtered;
+
+    float posX;
+    float posY;
 
     float last_tick;
 } chassis_t;
@@ -158,21 +167,13 @@ void imu_solve(chassis_t* chassis, MPU6050_Filter imu) {
     chassis->pitch = asin(2.0f * (w * z - y * x));
     chassis->yaw = atan2(2.0f * (w * x + y * z), 1.0f - 2.0f * (z * z + x * x));
 
-    chassis->vx += chassis->ax * dt;
-    chassis->vy += chassis->ay * dt;
-    chassis->vz += chassis->az * dt;
+    // chassis->vx += chassis->ax * dt;
+    // chassis->vy += chassis->ay * dt;
+    // chassis->vz += chassis->az * dt;
 
-    chassis->x += chassis->vx * dt;
-    chassis->y += chassis->vy * dt;
-    chassis->z += chassis->vz * dt;
-}
-
-void encoder_solve(chassis_t* chassis, double motor_l_real_speed, double motor_r_real_speed) {
-    chassis->v_left = motor_l_real_speed;
-    chassis->v_right = motor_r_real_speed;
-
-    chassis->s_left += chassis->v_left * dt;
-    chassis->s_right += chassis->v_right * dt;
+    // chassis->x += chassis->vx * dt;
+    // chassis->y += chassis->vy * dt;
+    // chassis->z += chassis->vz * dt;
 }
 
 void fd_kinematic(float v, float wz, float* v_left, float* v_right) {
@@ -183,6 +184,35 @@ void fd_kinematic(float v, float wz, float* v_left, float* v_right) {
 void bk_kinematic(float v_left, float v_right, float* v, float* wz) {
     *v = (v_left + v_right) / 2;
     *wz = (v_right - v_left) / WHEEL_DISTANCE;
+}
+
+SlidingWindowFilter v_left_filter(20);
+SlidingWindowFilter v_right_filter(20);
+
+void encoder_solve(chassis_t* chassis, double motor_l_real_speed, double motor_r_real_speed) {
+    double dt = (micros() - chassis->last_tick) / 1000000.0f;
+
+    chassis->v_left = 2.236f * motor_l_real_speed;
+    chassis->v_right = 2.236f * motor_r_real_speed;
+
+    v_left_filter.addValue(chassis->v_left);
+    v_right_filter.addValue(chassis->v_right);
+
+    chassis->v_left_filtered = v_left_filter.getAverage();
+    chassis->v_right_filtered = v_right_filter.getAverage();
+
+    chassis->s_left += chassis->v_left_filtered * dt;
+    chassis->s_right += chassis->v_right_filtered * dt;
+
+    bk_kinematic(chassis->v_left_filtered, chassis->v_right_filtered, &chassis->vx, &chassis->wz);
+    Serial.println(">v_left_filtered:" + String(chassis->v_left_filtered));
+    Serial.println(">v_right_filtered:" + String(chassis->v_right_filtered));
+    Serial.println(">solved_vx:" + String(chassis->vx));
+    Serial.println(">solved_wz:" + String(chassis->wz));
+    chassis->posX += chassis->vx * cos(chassis->yaw) * dt;
+    chassis->posY += chassis->vx * sin(chassis->yaw) * dt;
+
+    chassis->last_tick = micros();
 }
 
 // void cmd_control(chassis_t* chassis, recv_t* recv_packet) {
@@ -209,6 +239,8 @@ void send() {
     send_packet.roll = (int16_t)chassis->roll;
     send_packet.pitch = (int16_t)chassis->pitch;
     send_packet.yaw = (int16_t)chassis->yaw;
+    // send_packet.posX = (int16_t)chassis->x;
+    // send_packet.posY = (int16_t)chassis->y;
     // Serial.println("Initialized send_packet");
 
     send_packet.checksum = check_sum(1, (uint8_t*)&send_packet, sizeof(send_t) - 1);
@@ -224,16 +256,24 @@ void print_debug() {
     // imu
     // Serial.println("Acc: " + String(imu.accX) + ", " + String(imu.accY) + ", " + String(imu.accZ));
     // Serial.println("Gyro: " + String(imu.gyroXrate) + ", " + String(imu.gyroYrate) + ", " + String(imu.gyroZrate));
+
+    Serial.println("loop");
+    // Serial.println(">v_left:" + String(chassis->v_left));
+    // Serial.println(">v_right:" + String(chassis->v_right));
+    // Serial.println(">v_left_filtered:" + String(chassis->v_left_filtered));
+    // Serial.println(">v_right_filtered:" + String(chassis->v_right_filtered));
+    Serial.println(">posX:" + String(chassis->posX));
+    Serial.println(">posY:" + String(chassis->posY));
 }
 
 void serial_setup(void)
 {
-    Serial.println("Start serial setup");
+    Serial.println("setup");
     // start_calibrate_imu = true;
     // chassis
     chassis = (chassis_t*)calloc(1, sizeof(chassis_t));
     chassis->last_tick = millis();
-    strut_controller.base2_driver->set_speed_pid(0.15, 0.0, 0.0);
+    strut_controller.base2_driver->set_speed_pid(2, 0.0, 0.0);
 }
 void serial_loop(void)
 {
@@ -270,6 +310,8 @@ void serial_loop(void)
 
                     if (recv_packet.checksum == calculated_checksum) {
                         // 如果校验和正确，打印出接收到的数据
+                        // Serial.println(">vx:" + String(recv_packet.vx));
+                        // Serial.println(">wz:" + String(recv_packet.wz));
                         // Serial.println("Checksum is correct");
                         // Serial.print("recv_packet.vx:");
                         // Serial.println(recv_packet.vx);
@@ -283,7 +325,7 @@ void serial_loop(void)
                             // 调用函数处理接收到的指令
                             float expect_v_left, expect_v_right;
                             // fd_kinematic(recv_packet.vx, recv_packet.wz, &expect_v_left, &expect_v_right);
-                            strut_controller.set_target_velocity(true, recv_packet.vx, recv_packet.wz, millis());
+                            strut_controller.set_target_velocity(true, recv_packet.vx/=1.5, recv_packet.wz/2.0, millis());
                             // 更新上次的速度指令
                             last_vx = recv_packet.vx;
                             last_wz = recv_packet.wz;
@@ -302,6 +344,7 @@ void serial_loop(void)
     }
     encoder_solve(chassis, strut_controller.base2_driver->motor_l_real_speed, strut_controller.base2_driver->motor_l_real_speed);
     imu_solve(chassis, imu);
+    print_debug();
     send();
 } 
 
