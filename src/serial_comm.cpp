@@ -41,7 +41,6 @@ typedef struct{
     int16_t roll;
     int16_t pitch;
     int16_t yaw;
-    float q[4];
     int16_t posX;
     int16_t posY;
     uint8_t checksum;
@@ -172,9 +171,9 @@ void quaternionToRPY(const float q[4], float &roll, float &pitch, float &yaw) {
     yaw = std::atan2(2.0 * (q0 * q3 + q1 * q2), 1.0 - 2.0 * (q2 * q2 + q3 * q3));
 }
 
-SlidingWindowFilter roll_filter(20);
-SlidingWindowFilter pitch_filter(20);
-SlidingWindowFilter yaw_filter(20);
+// SlidingWindowFilter roll_filter(20);
+// SlidingWindowFilter pitch_filter(20);
+// SlidingWindowFilter yaw_filter(20);
 
 // void imu_solve(chassis_t* chassis, myIMU_Filter imu) {
 //     chassis->ax = imu.ax * 1000;
@@ -270,12 +269,6 @@ void send() {
     send_packet.roll = (int16_t)imu.roll * 1000;
     send_packet.pitch = (int16_t)imu.pitch * 1000;
     send_packet.yaw = (int16_t)imu.yaw * 1000;
-    
-    send_packet.q[0] = imu.q[0];
-    send_packet.q[1] = imu.q[1];
-    send_packet.q[2] = imu.q[2];
-    send_packet.q[3] = imu.q[3];
-
     send_packet.posX = (int16_t)chassis->x;
     send_packet.posY = (int16_t)chassis->y;
     // Serial.println("Initialized send_packet");

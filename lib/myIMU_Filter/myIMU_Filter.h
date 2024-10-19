@@ -52,9 +52,6 @@ private:
     SimpsonIntegrator VxToPx;
     SimpsonIntegrator VyToPy;
     SimpsonIntegrator VzToPz;
-    SimpsonIntegrator GxToRoll;
-    SimpsonIntegrator GyToPitch;
-    SimpsonIntegrator GzToYaw;
 };
 
 #endif
