@@ -226,7 +226,10 @@
  /home/shuhan/.platformio/packages/framework-arduinoespressif32/cores/esp32/esp32-hal.h \
  lib/MPU6050/src/helper_3dmath.h \
  /home/shuhan/.platformio/packages/framework-arduinoespressif32/libraries/EEPROM/src/EEPROM.h \
- lib/KalmanFilter/Kalman.h lib/Differential_Driver/Differential_Driver.h \
+ lib/KalmanFilter/Kalman.h lib/myIMU_Filter/myIMU_Filter.h \
+ lib/StandardKalmanFilter/StandardKalmanFilter.h \
+ lib/Filters/LowPassFilter.h lib/Filters/HighPassFilter.h \
+ lib/Integrators/simpson.h lib/Differential_Driver/Differential_Driver.h \
  lib/MPU6050/src/I2Cdev.h lib/Magnet_Lifter/Magnet_Lifter.h \
  /home/shuhan/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/soc/include/soc/uart_periph.h \
  /home/shuhan/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/soc/esp32s3/include/soc/uart_reg.h \

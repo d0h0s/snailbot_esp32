@@ -220,7 +220,11 @@
  /home/shuhan/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/driver/include/driver/pcnt.h \
  /home/shuhan/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/hal/include/hal/pcnt_types.h \
  lib/KalmanFilter/Kalman.h lib/ESP32Encoder/src/InterruptEncoder.h \
- lib/Differential_Driver/Differential_Driver.h lib/DC_Motor/DC_Motor.h \
+ lib/myIMU_Filter/myIMU_Filter.h \
+ lib/StandardKalmanFilter/StandardKalmanFilter.h \
+ lib/Filters/LowPassFilter.h lib/Filters/HighPassFilter.h \
+ lib/Integrators/simpson.h lib/Differential_Driver/Differential_Driver.h \
+ lib/DC_Motor/DC_Motor.h \
  /home/shuhan/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/driver/include/driver/mcpwm.h \
  /home/shuhan/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/hal/include/hal/mcpwm_types.h \
  .pio/libdeps/esp32-s3-devkitc-1/PID/PID_v1.h \

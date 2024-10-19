@@ -25,6 +25,7 @@
 #include <Wire.h>
 #include <I2Cdev.h>
 #include <MPU6050_Filter.h>
+#include "myIMU_Filter.h"
 #include "Magnet_Lifter.h"
 
 #include "soc/uart_periph.h"
@@ -92,7 +93,8 @@ ESP32Encoder encoder_F;
 MagnetLifter lifter1(&motor_B, &encoder_B, BLIM, LIFTER1_EEPROM_OFFSET, FLAG_SLEEP_LIFTER1_READY); // upper
 MagnetLifter lifter2(&motor_A, &encoder_A, ALIM, LIFTER2_EEPROM_OFFSET, FLAG_SLEEP_LIFTER2_READY); // lower
 
-MPU6050_Filter imu(&encoder_C, &encoder_F, IMU_EEPROM_OFFSET, 0x69); 
+// MPU6050_Filter imu(&encoder_C, &encoder_F, IMU_EEPROM_OFFSET, 0x69); 
+myIMU_Filter imu(0x69);
 bool start_calibrate_imu = false;
 
 //DifferentialDriver base1_driver(&motor_E, &encoder_E, &motor_D, &encoder_D, BASE1_EEPROM_OFFSET); // upper

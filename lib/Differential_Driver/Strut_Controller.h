@@ -3,6 +3,7 @@
 
 #include "Arduino.h"
 #include "MPU6050_Filter.h"
+#include "myIMU_Filter.h"
 #include "Differential_Driver.h"
 #include <freertos/queue.h>
 #include <queue>
@@ -48,7 +49,8 @@ class StrutController
 { 
   private:
 
-    MPU6050_Filter* orientation_filter;
+    //MPU6050_Filter* orientation_filter;
+    myIMU_Filter* orientation_filter;
 
     QueueHandle_t* send_key_queue;
 
@@ -72,7 +74,7 @@ class StrutController
     void base_loop(ControlState*);
     
   public:
-    StrutController(DifferentialDriver*, MPU6050_Filter*, QueueHandle_t*);
+    StrutController(DifferentialDriver*, myIMU_Filter*, QueueHandle_t*);
     DifferentialDriver *base2_driver;
     void loop(void);
     void pwm(bool, float, float);

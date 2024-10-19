@@ -111,7 +111,8 @@ extern MagnetLifter lifter2;
 extern DifferentialDriver base1_driver; 
 extern DifferentialDriver base2_driver;
 
-extern MPU6050_Filter imu;
+//extern MPU6050_Filter imu;
+extern myIMU_Filter imu;
 
 extern QueueHandle_t xSendKeyQueue;
 
@@ -175,36 +176,36 @@ SlidingWindowFilter roll_filter(20);
 SlidingWindowFilter pitch_filter(20);
 SlidingWindowFilter yaw_filter(20);
 
-void imu_solve(chassis_t* chassis, MPU6050_Filter imu) {
-    chassis->ax = imu.accX * 1000;
-    chassis->ay = imu.accY * 1000;
-    chassis->az = imu.accZ * 1000;
+// void imu_solve(chassis_t* chassis, myIMU_Filter imu) {
+//     chassis->ax = imu.ax * 1000;
+//     chassis->ay = imu.ay * 1000;
+//     chassis->az = imu.az * 1000;
 
-    chassis->wx = imu.gyroYrate * 1000;
-    chassis->wy = imu.gyroZrate * 1000;
-    chassis->wz = imu.gyroXrate * 1000;
+//     chassis->wx = imu.gx * 1000;
+//     chassis->wy = imu.gy * 1000;
+//     chassis->wz = imu.gz * 1000;
 
-    memcpy(chassis->q, imu.q, sizeof(float) * 4);
+//     memcpy(chassis->q, imu.q, sizeof(float) * 4);
 
-    quaternionToRPY(imu.q, chassis->roll, chassis->pitch, chassis->yaw);
-    roll_filter.addValue(chassis->roll);
-    pitch_filter.addValue(chassis->pitch);
-    yaw_filter.addValue(chassis->yaw);
-    chassis->roll = roll_filter.getAverage();
-    chassis->pitch = pitch_filter.getAverage();
-    chassis->yaw = yaw_filter.getAverage();
-    chassis->yaw *= 1000;
-    chassis->roll *= 1000;
-    chassis->pitch *= 1000;
+//     quaternionToRPY(imu.q, chassis->roll, chassis->pitch, chassis->yaw);
+//     roll_filter.addValue(chassis->roll);
+//     pitch_filter.addValue(chassis->pitch);
+//     yaw_filter.addValue(chassis->yaw);
+//     chassis->roll = roll_filter.getAverage();
+//     chassis->pitch = pitch_filter.getAverage();
+//     chassis->yaw = yaw_filter.getAverage();
+//     chassis->yaw *= 1000;
+//     chassis->roll *= 1000;
+//     chassis->pitch *= 1000;
 
-    // chassis->vx += chassis->ax * dt;
-    // chassis->vy += chassis->ay * dt;
-    // chassis->vz += chassis->az * dt;
+//     // chassis->vx += chassis->ax * dt;
+//     // chassis->vy += chassis->ay * dt;
+//     // chassis->vz += chassis->az * dt;
 
-    // chassis->x += chassis->vx * dt;
-    // chassis->y += chassis->vy * dt;
-    // chassis->z += chassis->vz * dt;
-}
+//     // chassis->x += chassis->vx * dt;
+//     // chassis->y += chassis->vy * dt;
+//     // chassis->z += chassis->vz * dt;
+// }
 
 void fd_kinematic(float v, float wz, float* v_left, float* v_right) {
     *v_left = (v - (wz * WHEEL_DISTANCE) / 2) * GEAR_RATIO / WHEEL_RADIUS / 1000;
@@ -257,19 +258,24 @@ void send() {
     send_t send_packet;
     send_packet.header = 0x7B;
     send_packet.flag_stop = 0;
-    send_packet.vx = (int16_t)chassis->vx;
-    send_packet.vy = (int16_t)chassis->vy;
-    send_packet.vz = (int16_t)chassis->vz;
-    send_packet.ax = (int16_t)chassis->ax;
-    send_packet.ay = (int16_t)chassis->ay;
-    send_packet.az = (int16_t)chassis->az;
-    send_packet.wx = (int16_t)chassis->wx;
-    send_packet.wy = (int16_t)chassis->wy;
-    send_packet.wz = (int16_t)chassis->wz;
-    send_packet.roll = (int16_t)chassis->roll;
-    send_packet.pitch = (int16_t)chassis->pitch;
-    send_packet.yaw = (int16_t)chassis->yaw;
-    memcpy(send_packet.q, chassis->q, sizeof(float) * 4);
+    send_packet.vx = (int16_t)imu.vx * 1000;  //chassis->vx;
+    send_packet.vy = (int16_t)imu.vy * 1000;
+    send_packet.vz = (int16_t)imu.vz * 1000;
+    send_packet.ax = (int16_t)imu.ax * 1000;
+    send_packet.ay = (int16_t)imu.ay * 1000;
+    send_packet.az = (int16_t)imu.az * 1000;
+    send_packet.wx = (int16_t)imu.gx * 1000;
+    send_packet.wy = (int16_t)imu.gy * 1000;
+    send_packet.wz = (int16_t)imu.gz * 1000;
+    send_packet.roll = (int16_t)imu.roll * 1000;
+    send_packet.pitch = (int16_t)imu.pitch * 1000;
+    send_packet.yaw = (int16_t)imu.yaw * 1000;
+    
+    send_packet.q[0] = imu.q[0];
+    send_packet.q[1] = imu.q[1];
+    send_packet.q[2] = imu.q[2];
+    send_packet.q[3] = imu.q[3];
+
     send_packet.posX = (int16_t)chassis->x;
     send_packet.posY = (int16_t)chassis->y;
     // Serial.println("Initialized send_packet");
@@ -288,19 +294,25 @@ void print_debug() {
     // Serial.println("Acc: " + String(imu.accX) + ", " + String(imu.accY) + ", " + String(imu.accZ));
     // Serial.println("Gyro: " + String(imu.gyroXrate) + ", " + String(imu.gyroYrate) + ", " + String(imu.gyroZrate));
 
-    Serial.println("loop");
+    // Serial.println("loop");
     // Serial.println(">v_left:" + String(chassis->v_left));
     // Serial.println(">v_right:" + String(chassis->v_right));
     // Serial.println(">v_left_filtered:" + String(chassis->v_left_filtered));
     // Serial.println(">v_right_filtered:" + String(chassis->v_right_filtered));
     // Serial.println(">posX:" + String(chassis->posX));
     // Serial.println(">posY:" + String(chassis->posY));
-    Serial.println(">roll:" + String(chassis->roll));
-    Serial.println(">pitch:" + String(chassis->pitch));
-    Serial.println(">yaw:" + String(chassis->yaw));
-    Serial.println(">wx:" + String(chassis->wx));
-    Serial.println(">wy:" + String(chassis->wy));
-    Serial.println(">wz:" + String(chassis->wz));
+    // Serial.println(">roll:" + String(imu.roll));
+    // Serial.println(">pitch:" + String(imu.pitch));
+    // Serial.println(">yaw:" + String(imu.yaw));
+    // Serial.println(">wx:" + String(imu.gx));
+    // Serial.println(">wy:" + String(imu.gy));
+    // Serial.println(">wz:" + String(imu.gz));
+    // Serial.println(">vx:" + String(imu.vx));
+    // Serial.println(">vy:" + String(imu.vy));
+    // Serial.println(">vz:" + String(imu.vz));
+    // Serial.println(">ax:" + String(imu.ax));
+    // Serial.println(">ay:" + String(imu.ay));
+    // Serial.println(">az:" + String(imu.az));
 }
 
 void serial_setup(void)
@@ -380,7 +392,7 @@ void serial_loop(void)
         }
     }
     encoder_solve(chassis, strut_controller.base2_driver->motor_l_real_speed, strut_controller.base2_driver->motor_l_real_speed);
-    imu_solve(chassis, imu);
+    // imu_solve(chassis, imu);
     print_debug();
     send();
 } 

@@ -198,5 +198,8 @@
  include/gpio.h \
  /home/shuhan/.platformio/packages/framework-arduinoespressif32/cores/esp32/HardwareSerial.h \
  include/eeprom_offset.h lib/Differential_Driver/Strut_Controller.h \
- lib/Differential_Driver/Differential_Driver.h \
+ lib/myIMU_Filter/myIMU_Filter.h \
+ lib/StandardKalmanFilter/StandardKalmanFilter.h \
+ lib/Filters/LowPassFilter.h lib/Filters/HighPassFilter.h \
+ lib/Integrators/simpson.h lib/Differential_Driver/Differential_Driver.h \
  lib/SlidingWindowFilter/SlidingWindowFilter.h
