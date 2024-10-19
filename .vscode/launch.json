@@ -12,9 +12,9 @@
             "type": "platformio-debug",
             "request": "launch",
             "name": "PIO Debug",
-            "executable": "C:/Users/zshha/Documents/Robotic/snailbot_esp32/.pio/build/esp32-s3-devkitc-1/firmware.elf",
+            "executable": "/home/shuhan/Documents/snailbot_esp32/.pio/build/esp32-s3-devkitc-1/firmware.elf",
             "projectEnvName": "esp32-s3-devkitc-1",
-            "toolchainBinDir": "C:/Users/zshha/.platformio/packages/toolchain-xtensa-esp32s3/bin",
+            "toolchainBinDir": "/home/shuhan/.platformio/packages/toolchain-xtensa-esp32s3/bin",
             "internalConsoleOptions": "openOnSessionStart",
             "preLaunchTask": {
                 "type": "PlatformIO",
@@ -25,18 +25,18 @@
             "type": "platformio-debug",
             "request": "launch",
             "name": "PIO Debug (skip Pre-Debug)",
-            "executable": "C:/Users/zshha/Documents/Robotic/snailbot_esp32/.pio/build/esp32-s3-devkitc-1/firmware.elf",
+            "executable": "/home/shuhan/Documents/snailbot_esp32/.pio/build/esp32-s3-devkitc-1/firmware.elf",
             "projectEnvName": "esp32-s3-devkitc-1",
-            "toolchainBinDir": "C:/Users/zshha/.platformio/packages/toolchain-xtensa-esp32s3/bin",
+            "toolchainBinDir": "/home/shuhan/.platformio/packages/toolchain-xtensa-esp32s3/bin",
             "internalConsoleOptions": "openOnSessionStart"
         },
         {
             "type": "platformio-debug",
             "request": "launch",
             "name": "PIO Debug (without uploading)",
-            "executable": "C:/Users/zshha/Documents/Robotic/snailbot_esp32/.pio/build/esp32-s3-devkitc-1/firmware.elf",
+            "executable": "/home/shuhan/Documents/snailbot_esp32/.pio/build/esp32-s3-devkitc-1/firmware.elf",
             "projectEnvName": "esp32-s3-devkitc-1",
-            "toolchainBinDir": "C:/Users/zshha/.platformio/packages/toolchain-xtensa-esp32s3/bin",
+            "toolchainBinDir": "/home/shuhan/.platformio/packages/toolchain-xtensa-esp32s3/bin",
             "internalConsoleOptions": "openOnSessionStart",
             "loadMode": "manual"
         }

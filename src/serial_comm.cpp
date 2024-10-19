@@ -41,8 +41,9 @@ typedef struct{
     int16_t roll;
     int16_t pitch;
     int16_t yaw;
-    // int16_t posX;
-    // int16_t posY;
+    float q[4];
+    int16_t posX;
+    int16_t posY;
     uint8_t checksum;
 } __attribute__((packed)) send_t;
 
@@ -70,6 +71,8 @@ typedef struct{
     float roll;
     float pitch;
     float yaw;
+
+    float q[4];
 
     float wx;
     float wy;
@@ -150,22 +153,49 @@ unsigned char check_sum(unsigned char Mode, uint8_t* data, size_t len) {
     return sum;
 }
 
+void quaternionToRPY(const float q[4], float &roll, float &pitch, float &yaw) {
+    // Normalize the quaternion
+    double norm = std::sqrt(q[0] * q[0] + q[1] * q[1] + q[2] * q[2] + q[3] * q[3]);
+    double q0 = q[0] / norm;
+    double q1 = q[1] / norm;
+    double q2 = q[2] / norm;
+    double q3 = q[3] / norm;
+
+    // Compute roll (x-axis rotation)
+    roll = std::atan2(2.0 * (q0 * q1 + q2 * q3), 1.0 - 2.0 * (q1 * q1 + q2 * q2));
+
+    // Compute pitch (y-axis rotation)
+    pitch = std::asin(2.0 * (q0 * q2 - q3 * q1));
+
+    // Compute yaw (z-axis rotation)
+    yaw = std::atan2(2.0 * (q0 * q3 + q1 * q2), 1.0 - 2.0 * (q2 * q2 + q3 * q3));
+}
+
+SlidingWindowFilter roll_filter(20);
+SlidingWindowFilter pitch_filter(20);
+SlidingWindowFilter yaw_filter(20);
+
 void imu_solve(chassis_t* chassis, MPU6050_Filter imu) {
     chassis->ax = imu.accX * 1000;
     chassis->ay = imu.accY * 1000;
     chassis->az = imu.accZ * 1000;
 
-    chassis->wx = imu.gyroXrate * 1000;
-    chassis->wy = imu.gyroYrate * 1000;
-    chassis->wz = imu.gyroZrate * 1000;
+    chassis->wx = imu.gyroYrate * 1000;
+    chassis->wy = imu.gyroZrate * 1000;
+    chassis->wz = imu.gyroXrate * 1000;
 
-    float w = imu.q[0];
-    float x = imu.q[1];
-    float y = imu.q[2];
-    float z = imu.q[3];
-    chassis->roll = atan2(2.0f * (w * y + x * z), 1.0f - 2.0f * (y * y + x * x));
-    chassis->pitch = asin(2.0f * (w * z - y * x));
-    chassis->yaw = atan2(2.0f * (w * x + y * z), 1.0f - 2.0f * (z * z + x * x));
+    memcpy(chassis->q, imu.q, sizeof(float) * 4);
+
+    quaternionToRPY(imu.q, chassis->roll, chassis->pitch, chassis->yaw);
+    roll_filter.addValue(chassis->roll);
+    pitch_filter.addValue(chassis->pitch);
+    yaw_filter.addValue(chassis->yaw);
+    chassis->roll = roll_filter.getAverage();
+    chassis->pitch = pitch_filter.getAverage();
+    chassis->yaw = yaw_filter.getAverage();
+    chassis->yaw *= 1000;
+    chassis->roll *= 1000;
+    chassis->pitch *= 1000;
 
     // chassis->vx += chassis->ax * dt;
     // chassis->vy += chassis->ay * dt;
@@ -205,10 +235,10 @@ void encoder_solve(chassis_t* chassis, double motor_l_real_speed, double motor_r
     chassis->s_right += chassis->v_right_filtered * dt;
 
     bk_kinematic(chassis->v_left_filtered, chassis->v_right_filtered, &chassis->vx, &chassis->wz);
-    Serial.println(">v_left_filtered:" + String(chassis->v_left_filtered));
-    Serial.println(">v_right_filtered:" + String(chassis->v_right_filtered));
-    Serial.println(">solved_vx:" + String(chassis->vx));
-    Serial.println(">solved_wz:" + String(chassis->wz));
+    // Serial.println(">v_left_filtered:" + String(chassis->v_left_filtered));
+    // Serial.println(">v_right_filtered:" + String(chassis->v_right_filtered));
+    // Serial.println(">solved_vx:" + String(chassis->vx));
+    // Serial.println(">solved_wz:" + String(chassis->wz));
     chassis->posX += chassis->vx * cos(chassis->yaw) * dt;
     chassis->posY += chassis->vx * sin(chassis->yaw) * dt;
 
@@ -239,8 +269,9 @@ void send() {
     send_packet.roll = (int16_t)chassis->roll;
     send_packet.pitch = (int16_t)chassis->pitch;
     send_packet.yaw = (int16_t)chassis->yaw;
-    // send_packet.posX = (int16_t)chassis->x;
-    // send_packet.posY = (int16_t)chassis->y;
+    memcpy(send_packet.q, chassis->q, sizeof(float) * 4);
+    send_packet.posX = (int16_t)chassis->x;
+    send_packet.posY = (int16_t)chassis->y;
     // Serial.println("Initialized send_packet");
 
     send_packet.checksum = check_sum(1, (uint8_t*)&send_packet, sizeof(send_t) - 1);
@@ -262,8 +293,14 @@ void print_debug() {
     // Serial.println(">v_right:" + String(chassis->v_right));
     // Serial.println(">v_left_filtered:" + String(chassis->v_left_filtered));
     // Serial.println(">v_right_filtered:" + String(chassis->v_right_filtered));
-    Serial.println(">posX:" + String(chassis->posX));
-    Serial.println(">posY:" + String(chassis->posY));
+    // Serial.println(">posX:" + String(chassis->posX));
+    // Serial.println(">posY:" + String(chassis->posY));
+    Serial.println(">roll:" + String(chassis->roll));
+    Serial.println(">pitch:" + String(chassis->pitch));
+    Serial.println(">yaw:" + String(chassis->yaw));
+    Serial.println(">wx:" + String(chassis->wx));
+    Serial.println(">wy:" + String(chassis->wy));
+    Serial.println(">wz:" + String(chassis->wz));
 }
 
 void serial_setup(void)
@@ -310,8 +347,8 @@ void serial_loop(void)
 
                     if (recv_packet.checksum == calculated_checksum) {
                         // 如果校验和正确，打印出接收到的数据
-                        // Serial.println(">vx:" + String(recv_packet.vx));
-                        // Serial.println(">wz:" + String(recv_packet.wz));
+                        Serial.println(">vx:" + String(recv_packet.vx));
+                        Serial.println(">wz:" + String(recv_packet.wz));
                         // Serial.println("Checksum is correct");
                         // Serial.print("recv_packet.vx:");
                         // Serial.println(recv_packet.vx);
