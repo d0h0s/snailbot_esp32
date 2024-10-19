@@ -13,7 +13,7 @@
 #define BASE_MOTOR_INVALID_AMP 0.1
 
 // #define MOTOR_RATIO_RAD (2.f * PI / 1260.f / 14.f)
-#define MOTOR_RATIO_RAD (2.f * PI / 7000.f / 1.6f)
+#define MOTOR_RATIO_RAD (3.f * 2.f / 2.5f * PI / 7000.f / 1.6f)
 #define GEAR_RATIO 1600
 #define WHEEL_RADIUS 0.02
 #define WHEEL_DISTANCE 0.08075
@@ -65,6 +65,8 @@ class DifferentialDriver
     size_t copy_debug_data(byte* addr);
     double motor_l_real_speed, motor_l_pwm, motor_l_target_speed = 0.;
     double motor_r_real_speed, motor_r_pwm, motor_r_target_speed = 0.;
+
+    double last_l_pwm, last_r_pwm;
 };
   
 #endif
