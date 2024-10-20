@@ -29,20 +29,21 @@
 typedef struct{
     uint8_t header;
     uint8_t flag_stop;
-    double vx;
-    double vy;
-    double vz;
-    double ax;
-    double ay;
-    double az;
-    double wx;
-    double wy;
-    double wz;
-    double roll;
-    double pitch;
-    double yaw;
-    double posX;
-    double posY;
+    int16_t vx;
+    int16_t vy;
+    int16_t vz;
+    int16_t ax;
+    int16_t ay;
+    int16_t az;
+    int16_t wx;
+    int16_t wy;
+    int16_t wz;
+    int16_t roll;
+    int16_t pitch;
+    int16_t yaw;
+    int16_t posX;
+    int16_t posY;
+    int16_t th;
     uint8_t checksum;
 } __attribute__((packed)) send_t;
 
@@ -88,6 +89,7 @@ typedef struct{
 
     float posX;
     float posY;
+    float th;
 
     float last_tick;
 } chassis_t;
@@ -176,17 +178,17 @@ void quaternionToRPY(const float q[4], float &roll, float &pitch, float &yaw) {
 // SlidingWindowFilter yaw_filter(20);
 
 void imu_solve(chassis_t* chassis, myIMU_Filter imu) {
-    chassis->ax = imu.ax * 1000;
-    chassis->ay = imu.ay * 1000;
-    chassis->az = imu.az * 1000;
+    chassis->ax = imu.ax;
+    chassis->ay = imu.ay;
+    chassis->az = imu.az;
 
-    chassis->wx = imu.gx * 1000;
-    chassis->wy = imu.gy * 1000;
-    chassis->wz = imu.gz * 1000;
+    chassis->wx = imu.gx;
+    chassis->wy = imu.gy;
+    chassis->wz = imu.gz;
 
-    chassis->roll = imu.roll * 1000;
-    chassis->pitch = imu.pitch * 1000;
-    chassis->yaw = imu.yaw * 1000;
+    chassis->roll = imu.roll;
+    chassis->pitch = imu.pitch;
+    chassis->yaw = imu.yaw;
 
     chassis->vx += chassis->ax * dt;
     chassis->vy += chassis->ay * dt;
@@ -232,6 +234,7 @@ void encoder_solve(chassis_t* chassis, double motor_l_real_speed, double motor_r
     // Serial.println(">solved_wz:" + String(chassis->wz));
     chassis->posX += chassis->vx * cos(chassis->yaw) * dt;
     chassis->posY += chassis->vx * sin(chassis->yaw) * dt;
+    chassis->th += chassis->wz * dt;
 
     chassis->last_tick = micros();
 }
@@ -248,23 +251,24 @@ void send() {
     send_t send_packet;
     send_packet.header = 0x7B;
     send_packet.flag_stop = 0;
-    send_packet.vx = imu.vx;  //chassis->vx;
-    send_packet.vy = imu.vy;
-    send_packet.vz = imu.vz;
-    send_packet.ax = imu.ax;
-    send_packet.ay = imu.ay;
-    send_packet.az = imu.az;
-    send_packet.wx = imu.gx;
-    send_packet.wy = imu.gy;
-    send_packet.wz = imu.gz;
-    send_packet.roll = imu.roll;
-    send_packet.pitch = imu.pitch;
-    send_packet.yaw = imu.yaw;
+    send_packet.vx = imu.vx * 10000;  //chassis->vx;
+    send_packet.vy = imu.vy * 10000;
+    send_packet.vz = imu.vz * 10000;
+    send_packet.ax = imu.ax * 10000;
+    send_packet.ay = imu.ay * 10000;
+    send_packet.az = imu.az * 10000;
+    send_packet.wx = imu.gx * 10000;
+    send_packet.wy = imu.gy * 10000;
+    send_packet.wz = imu.gz * 10000;
+    send_packet.roll = imu.roll * 10000;
+    send_packet.pitch = -imu.pitch * 10000;
+    send_packet.yaw = imu.yaw * 10000;
 
     Serial.println("yaw: " + String(imu.yaw));
 
-    send_packet.posX = chassis->x;
-    send_packet.posY = chassis->y;
+    send_packet.posX = chassis->x * 10000;
+    send_packet.posY = chassis->y * 10000;
+    send_packet.th = chassis->th * 10000;
     // Serial.println("Initialized send_packet");
 
     send_packet.checksum = check_sum(1, (uint8_t*)&send_packet, sizeof(send_t) - 1);
