@@ -29,20 +29,20 @@
 typedef struct{
     uint8_t header;
     uint8_t flag_stop;
-    int16_t vx;
-    int16_t vy;
-    int16_t vz;
-    int16_t ax;
-    int16_t ay;
-    int16_t az;
-    int16_t wx;
-    int16_t wy;
-    int16_t wz;
-    int16_t roll;
-    int16_t pitch;
-    int16_t yaw;
-    int16_t posX;
-    int16_t posY;
+    double vx;
+    double vy;
+    double vz;
+    double ax;
+    double ay;
+    double az;
+    double wx;
+    double wy;
+    double wz;
+    double roll;
+    double pitch;
+    double yaw;
+    double posX;
+    double posY;
     uint8_t checksum;
 } __attribute__((packed)) send_t;
 
@@ -175,36 +175,27 @@ void quaternionToRPY(const float q[4], float &roll, float &pitch, float &yaw) {
 // SlidingWindowFilter pitch_filter(20);
 // SlidingWindowFilter yaw_filter(20);
 
-// void imu_solve(chassis_t* chassis, myIMU_Filter imu) {
-//     chassis->ax = imu.ax * 1000;
-//     chassis->ay = imu.ay * 1000;
-//     chassis->az = imu.az * 1000;
+void imu_solve(chassis_t* chassis, myIMU_Filter imu) {
+    chassis->ax = imu.ax * 1000;
+    chassis->ay = imu.ay * 1000;
+    chassis->az = imu.az * 1000;
 
-//     chassis->wx = imu.gx * 1000;
-//     chassis->wy = imu.gy * 1000;
-//     chassis->wz = imu.gz * 1000;
+    chassis->wx = imu.gx * 1000;
+    chassis->wy = imu.gy * 1000;
+    chassis->wz = imu.gz * 1000;
 
-//     memcpy(chassis->q, imu.q, sizeof(float) * 4);
+    chassis->roll = imu.roll * 1000;
+    chassis->pitch = imu.pitch * 1000;
+    chassis->yaw = imu.yaw * 1000;
 
-//     quaternionToRPY(imu.q, chassis->roll, chassis->pitch, chassis->yaw);
-//     roll_filter.addValue(chassis->roll);
-//     pitch_filter.addValue(chassis->pitch);
-//     yaw_filter.addValue(chassis->yaw);
-//     chassis->roll = roll_filter.getAverage();
-//     chassis->pitch = pitch_filter.getAverage();
-//     chassis->yaw = yaw_filter.getAverage();
-//     chassis->yaw *= 1000;
-//     chassis->roll *= 1000;
-//     chassis->pitch *= 1000;
+    chassis->vx += chassis->ax * dt;
+    chassis->vy += chassis->ay * dt;
+    chassis->vz += chassis->az * dt;
 
-//     // chassis->vx += chassis->ax * dt;
-//     // chassis->vy += chassis->ay * dt;
-//     // chassis->vz += chassis->az * dt;
-
-//     // chassis->x += chassis->vx * dt;
-//     // chassis->y += chassis->vy * dt;
-//     // chassis->z += chassis->vz * dt;
-// }
+    // chassis->x += chassis->vx * dt;
+    // chassis->y += chassis->vy * dt;
+    // chassis->z += chassis->vz * dt;
+}
 
 void fd_kinematic(float v, float wz, float* v_left, float* v_right) {
     *v_left = (v - (wz * WHEEL_DISTANCE) / 2) * GEAR_RATIO / WHEEL_RADIUS / 1000;
@@ -257,20 +248,23 @@ void send() {
     send_t send_packet;
     send_packet.header = 0x7B;
     send_packet.flag_stop = 0;
-    send_packet.vx = (int16_t)imu.vx * 1000;  //chassis->vx;
-    send_packet.vy = (int16_t)imu.vy * 1000;
-    send_packet.vz = (int16_t)imu.vz * 1000;
-    send_packet.ax = (int16_t)imu.ax * 1000;
-    send_packet.ay = (int16_t)imu.ay * 1000;
-    send_packet.az = (int16_t)imu.az * 1000;
-    send_packet.wx = (int16_t)imu.gx * 1000;
-    send_packet.wy = (int16_t)imu.gy * 1000;
-    send_packet.wz = (int16_t)imu.gz * 1000;
-    send_packet.roll = (int16_t)imu.roll * 1000;
-    send_packet.pitch = (int16_t)imu.pitch * 1000;
-    send_packet.yaw = (int16_t)imu.yaw * 1000;
-    send_packet.posX = (int16_t)chassis->x;
-    send_packet.posY = (int16_t)chassis->y;
+    send_packet.vx = imu.vx;  //chassis->vx;
+    send_packet.vy = imu.vy;
+    send_packet.vz = imu.vz;
+    send_packet.ax = imu.ax;
+    send_packet.ay = imu.ay;
+    send_packet.az = imu.az;
+    send_packet.wx = imu.gx;
+    send_packet.wy = imu.gy;
+    send_packet.wz = imu.gz;
+    send_packet.roll = imu.roll;
+    send_packet.pitch = imu.pitch;
+    send_packet.yaw = imu.yaw;
+
+    Serial.println("yaw: " + String(imu.yaw));
+
+    send_packet.posX = chassis->x;
+    send_packet.posY = chassis->y;
     // Serial.println("Initialized send_packet");
 
     send_packet.checksum = check_sum(1, (uint8_t*)&send_packet, sizeof(send_t) - 1);
@@ -314,7 +308,7 @@ void serial_setup(void)
     // start_calibrate_imu = true;
     // chassis
     chassis = (chassis_t*)calloc(1, sizeof(chassis_t));
-    chassis->last_tick = millis();
+    chassis->last_tick = micros();
     strut_controller.base2_driver->set_speed_pid(2, 0.0, 0.0);
 }
 void serial_loop(void)
@@ -385,7 +379,7 @@ void serial_loop(void)
         }
     }
     encoder_solve(chassis, strut_controller.base2_driver->motor_l_real_speed, strut_controller.base2_driver->motor_l_real_speed);
-    // imu_solve(chassis, imu);
+    imu_solve(chassis, imu);
     print_debug();
     send();
 } 

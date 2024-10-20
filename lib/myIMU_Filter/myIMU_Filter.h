@@ -6,6 +6,7 @@
 #include "StandardKalmanFilter.h"
 #include "LowPassFilter.h"
 #include "HighPassFilter.h"
+#include "SlidingWindowFilter.h"
 #include "simpson.h"
 #include <cmath>
 
@@ -33,7 +34,7 @@ private:
 
     bool in_calib = 0;
 
-    void updateIMU(bool);
+    void updateIMU();
     void gyro_loop();
     void acc_loop();
     void getQuaternion();
@@ -41,10 +42,12 @@ private:
     LowPassFilter lpfAx;
     LowPassFilter lpfAy;
     LowPassFilter lpfAz;
-
+    KalmanFilter kalmanAx;
+    KalmanFilter kalmanAy;
+    KalmanFilter kalmanAz;
     KalmanFilter kalmanGx;
     KalmanFilter kalmanGy;
-    KalmanFilter kalmanGz;
+    KalmanFilter kalmanGz;   
 
     SimpsonIntegrator AxToVx;
     SimpsonIntegrator AyToVy;
