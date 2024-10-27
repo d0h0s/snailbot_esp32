@@ -1,3 +1,6 @@
+#ifndef SLIDINGWINDOWFILTER_H
+#define SLIDINGWINDOWFILTER_H
+
 #include <Arduino.h>
 #include <cstddef>
 
@@ -17,3 +20,5 @@ private:
     int windowIndex;
     float windowSum;
 };
+
+#endif

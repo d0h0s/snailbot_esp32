@@ -1,6 +1,6 @@
 #include "Strut_Controller.h"
 
-StrutController::StrutController(DifferentialDriver* base2_driver_, MPU6050_Filter* filter, QueueHandle_t* send_key_queue_) 
+StrutController::StrutController(DifferentialDriver* base2_driver_, myIMU_Filter* filter, QueueHandle_t* send_key_queue_) 
 {
     //base1_driver = base1_driver_;
     base2_driver = base2_driver_;
@@ -277,7 +277,7 @@ void StrutController::cooperate_triangle_loop(ControlState* state)
 
 bool StrutController::check_filter_status(ControlState* state)
 {
-    enum FilterMode filter_mode = orientation_filter->get_mode();
+    enum FilterMode filter_mode = BOTH; //orientation_filter->get_mode();
     if (filter_mode == BOTH) return true;
 
     switch (state->mode) {
@@ -300,14 +300,14 @@ void StrutController::calculate_error(ControlState* state) // disconnect might h
     q2 = orientation_filter->q[2];
     q3 = orientation_filter->q[3];
 
-    enum FilterMode filter_mode = orientation_filter->get_mode();
+    enum FilterMode filter_mode = BOTH; //orientation_filter->get_mode();
     if (!state->is_base2 && filter_mode == BOTH) { // base1
         // transform the quat base frame base2 -> base1
         // fh: father node horizontal (base2), ch: child node horizontal (base1)
         // q^{world}_{ch} = q^{world}_{fh} * q^{fh}_{ch}
         // quat_z(yaw) = q^{fh}_{ch}
         // q^{ch}_{s} = q^{ch}{fh} * q^{fh}_{s} = quat_z(-yaw) * q^{fh}_{s}
-        float yaw_half = - orientation_filter->get_yaw_angle() / 2.;
+        float yaw_half = - orientation_filter->yaw; //get_yaw_angle() / 2.;
         float p0, p3, q0_, q1_, q2_, q3_;
         //float p1 = 0.f, p2 = 0.f;
         p0 = cos(yaw_half);
@@ -325,22 +325,22 @@ void StrutController::calculate_error(ControlState* state) // disconnect might h
         q0 = q0_; q1 = q1_; q2 = q2_; q3 = q3_;
     }
 
-    if (state->param->relative_to_node) {
-        float node_q0, node_q1, node_q2, node_q3;
-        if (state->is_base2) {
-            orientation_filter->get_node2_quat(node_q0, node_q1, node_q2, node_q3);
-        }
-        else {
-            orientation_filter->get_node1_quat(node_q0, node_q1, node_q2, node_q3);
-        }
-        // q^N_S = q^Nh_N* x q^Nh_S 
-        float q0_, q1_, q2_, q3_;
-        q0_ =  node_q0 * q0 + node_q1 * q1 + node_q2 * q2 + node_q3 * q3;
-        q1_ = -node_q1 * q0 + node_q0 * q1 + node_q3 * q2 - node_q2 * q3;
-        q2_ = -node_q2 * q0 - node_q3 * q1 + node_q0 * q2 + node_q1 * q3;
-        q3_ = -node_q3 * q0 + node_q2 * q1 - node_q1 * q2 + node_q0 * q3;
-        q0 = q0_; q1 = q1_; q2 = q2_; q3 = q3_;
-    } 
+    // if (state->param->relative_to_node) {
+    //     float node_q0, node_q1, node_q2, node_q3;
+    //     if (state->is_base2) {
+    //         orientation_filter->get_node2_quat(node_q0, node_q1, node_q2, node_q3);
+    //     }
+    //     else {
+    //         orientation_filter->get_node1_quat(node_q0, node_q1, node_q2, node_q3);
+    //     }
+    //     // q^N_S = q^Nh_N* x q^Nh_S 
+    //     float q0_, q1_, q2_, q3_;
+    //     q0_ =  node_q0 * q0 + node_q1 * q1 + node_q2 * q2 + node_q3 * q3;
+    //     q1_ = -node_q1 * q0 + node_q0 * q1 + node_q3 * q2 - node_q2 * q3;
+    //     q2_ = -node_q2 * q0 - node_q3 * q1 + node_q0 * q2 + node_q1 * q3;
+    //     q3_ = -node_q3 * q0 + node_q2 * q1 - node_q1 * q2 + node_q0 * q3;
+    //     q0 = q0_; q1 = q1_; q2 = q2_; q3 = q3_;
+    // } 
 
     float _2q0 = 2.0f * q0;
     float _2q1 = 2.0f * q1;

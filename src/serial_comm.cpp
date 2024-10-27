@@ -41,8 +41,9 @@ typedef struct{
     int16_t roll;
     int16_t pitch;
     int16_t yaw;
-    // int16_t posX;
-    // int16_t posY;
+    int16_t posX;
+    int16_t posY;
+    int16_t th;
     uint8_t checksum;
 } __attribute__((packed)) send_t;
 
@@ -71,6 +72,8 @@ typedef struct{
     float pitch;
     float yaw;
 
+    float q[4];
+
     float wx;
     float wy;
     float wz;
@@ -86,6 +89,7 @@ typedef struct{
 
     float posX;
     float posY;
+    float th;
 
     float last_tick;
 } chassis_t;
@@ -108,7 +112,8 @@ extern MagnetLifter lifter2;
 extern DifferentialDriver base1_driver; 
 extern DifferentialDriver base2_driver;
 
-extern MPU6050_Filter imu;
+//extern MPU6050_Filter imu;
+extern myIMU_Filter imu;
 
 extern QueueHandle_t xSendKeyQueue;
 
@@ -150,26 +155,44 @@ unsigned char check_sum(unsigned char Mode, uint8_t* data, size_t len) {
     return sum;
 }
 
-void imu_solve(chassis_t* chassis, MPU6050_Filter imu) {
-    chassis->ax = imu.accX * 1000;
-    chassis->ay = imu.accY * 1000;
-    chassis->az = imu.accZ * 1000;
+void quaternionToRPY(const float q[4], float &roll, float &pitch, float &yaw) {
+    // Normalize the quaternion
+    double norm = std::sqrt(q[0] * q[0] + q[1] * q[1] + q[2] * q[2] + q[3] * q[3]);
+    double q0 = q[0] / norm;
+    double q1 = q[1] / norm;
+    double q2 = q[2] / norm;
+    double q3 = q[3] / norm;
 
-    chassis->wx = imu.gyroXrate * 1000;
-    chassis->wy = imu.gyroYrate * 1000;
-    chassis->wz = imu.gyroZrate * 1000;
+    // Compute roll (x-axis rotation)
+    roll = std::atan2(2.0 * (q0 * q1 + q2 * q3), 1.0 - 2.0 * (q1 * q1 + q2 * q2));
 
-    float w = imu.q[0];
-    float x = imu.q[1];
-    float y = imu.q[2];
-    float z = imu.q[3];
-    chassis->roll = atan2(2.0f * (w * y + x * z), 1.0f - 2.0f * (y * y + x * x));
-    chassis->pitch = asin(2.0f * (w * z - y * x));
-    chassis->yaw = atan2(2.0f * (w * x + y * z), 1.0f - 2.0f * (z * z + x * x));
+    // Compute pitch (y-axis rotation)
+    pitch = std::asin(2.0 * (q0 * q2 - q3 * q1));
 
-    // chassis->vx += chassis->ax * dt;
-    // chassis->vy += chassis->ay * dt;
-    // chassis->vz += chassis->az * dt;
+    // Compute yaw (z-axis rotation)
+    yaw = std::atan2(2.0 * (q0 * q3 + q1 * q2), 1.0 - 2.0 * (q2 * q2 + q3 * q3));
+}
+
+// SlidingWindowFilter roll_filter(20);
+// SlidingWindowFilter pitch_filter(20);
+// SlidingWindowFilter yaw_filter(20);
+
+void imu_solve(chassis_t* chassis, myIMU_Filter imu) {
+    chassis->ax = imu.ax;
+    chassis->ay = imu.ay;
+    chassis->az = imu.az;
+
+    chassis->wx = imu.gx;
+    chassis->wy = imu.gy;
+    chassis->wz = imu.gz;
+
+    chassis->roll = imu.roll;
+    chassis->pitch = imu.pitch;
+    chassis->yaw = imu.yaw;
+
+    chassis->vx += chassis->ax * dt;
+    chassis->vy += chassis->ay * dt;
+    chassis->vz += chassis->az * dt;
 
     // chassis->x += chassis->vx * dt;
     // chassis->y += chassis->vy * dt;
@@ -205,12 +228,13 @@ void encoder_solve(chassis_t* chassis, double motor_l_real_speed, double motor_r
     chassis->s_right += chassis->v_right_filtered * dt;
 
     bk_kinematic(chassis->v_left_filtered, chassis->v_right_filtered, &chassis->vx, &chassis->wz);
-    Serial.println(">v_left_filtered:" + String(chassis->v_left_filtered));
-    Serial.println(">v_right_filtered:" + String(chassis->v_right_filtered));
-    Serial.println(">solved_vx:" + String(chassis->vx));
-    Serial.println(">solved_wz:" + String(chassis->wz));
+    // Serial.println(">v_left_filtered:" + String(chassis->v_left_filtered));
+    // Serial.println(">v_right_filtered:" + String(chassis->v_right_filtered));
+    // Serial.println(">solved_vx:" + String(chassis->vx));
+    // Serial.println(">solved_wz:" + String(chassis->wz));
     chassis->posX += chassis->vx * cos(chassis->yaw) * dt;
     chassis->posY += chassis->vx * sin(chassis->yaw) * dt;
+    chassis->th += chassis->wz * dt;
 
     chassis->last_tick = micros();
 }
@@ -227,20 +251,24 @@ void send() {
     send_t send_packet;
     send_packet.header = 0x7B;
     send_packet.flag_stop = 0;
-    send_packet.vx = (int16_t)chassis->vx;
-    send_packet.vy = (int16_t)chassis->vy;
-    send_packet.vz = (int16_t)chassis->vz;
-    send_packet.ax = (int16_t)chassis->ax;
-    send_packet.ay = (int16_t)chassis->ay;
-    send_packet.az = (int16_t)chassis->az;
-    send_packet.wx = (int16_t)chassis->wx;
-    send_packet.wy = (int16_t)chassis->wy;
-    send_packet.wz = (int16_t)chassis->wz;
-    send_packet.roll = (int16_t)chassis->roll;
-    send_packet.pitch = (int16_t)chassis->pitch;
-    send_packet.yaw = (int16_t)chassis->yaw;
-    // send_packet.posX = (int16_t)chassis->x;
-    // send_packet.posY = (int16_t)chassis->y;
+    send_packet.vx = imu.vx * 10000;  //chassis->vx;
+    send_packet.vy = imu.vy * 10000;
+    send_packet.vz = imu.vz * 10000;
+    send_packet.ax = imu.ax * 10000;
+    send_packet.ay = imu.ay * 10000;
+    send_packet.az = imu.az * 10000;
+    send_packet.wx = imu.gx * 10000;
+    send_packet.wy = imu.gy * 10000;
+    send_packet.wz = imu.gz * 10000;
+    send_packet.roll = imu.roll * 10000;
+    send_packet.pitch = -imu.pitch * 10000;
+    send_packet.yaw = imu.yaw * 10000;
+
+    Serial.println("yaw: " + String(imu.yaw));
+
+    send_packet.posX = chassis->x * 10000;
+    send_packet.posY = chassis->y * 10000;
+    send_packet.th = chassis->th * 10000;
     // Serial.println("Initialized send_packet");
 
     send_packet.checksum = check_sum(1, (uint8_t*)&send_packet, sizeof(send_t) - 1);
@@ -257,13 +285,25 @@ void print_debug() {
     // Serial.println("Acc: " + String(imu.accX) + ", " + String(imu.accY) + ", " + String(imu.accZ));
     // Serial.println("Gyro: " + String(imu.gyroXrate) + ", " + String(imu.gyroYrate) + ", " + String(imu.gyroZrate));
 
-    Serial.println("loop");
+    // Serial.println("loop");
     // Serial.println(">v_left:" + String(chassis->v_left));
     // Serial.println(">v_right:" + String(chassis->v_right));
     // Serial.println(">v_left_filtered:" + String(chassis->v_left_filtered));
     // Serial.println(">v_right_filtered:" + String(chassis->v_right_filtered));
-    Serial.println(">posX:" + String(chassis->posX));
-    Serial.println(">posY:" + String(chassis->posY));
+    // Serial.println(">posX:" + String(chassis->posX));
+    // Serial.println(">posY:" + String(chassis->posY));
+    // Serial.println(">roll:" + String(imu.roll));
+    // Serial.println(">pitch:" + String(imu.pitch));
+    // Serial.println(">yaw:" + String(imu.yaw));
+    // Serial.println(">wx:" + String(imu.gx));
+    // Serial.println(">wy:" + String(imu.gy));
+    // Serial.println(">wz:" + String(imu.gz));
+    // Serial.println(">vx:" + String(imu.vx));
+    // Serial.println(">vy:" + String(imu.vy));
+    // Serial.println(">vz:" + String(imu.vz));
+    // Serial.println(">ax:" + String(imu.ax));
+    // Serial.println(">ay:" + String(imu.ay));
+    // Serial.println(">az:" + String(imu.az));
 }
 
 void serial_setup(void)
@@ -272,7 +312,7 @@ void serial_setup(void)
     // start_calibrate_imu = true;
     // chassis
     chassis = (chassis_t*)calloc(1, sizeof(chassis_t));
-    chassis->last_tick = millis();
+    chassis->last_tick = micros();
     strut_controller.base2_driver->set_speed_pid(2, 0.0, 0.0);
 }
 void serial_loop(void)
@@ -310,8 +350,8 @@ void serial_loop(void)
 
                     if (recv_packet.checksum == calculated_checksum) {
                         // 如果校验和正确，打印出接收到的数据
-                        // Serial.println(">vx:" + String(recv_packet.vx));
-                        // Serial.println(">wz:" + String(recv_packet.wz));
+                        Serial.println(">vx:" + String(recv_packet.vx));
+                        Serial.println(">wz:" + String(recv_packet.wz));
                         // Serial.println("Checksum is correct");
                         // Serial.print("recv_packet.vx:");
                         // Serial.println(recv_packet.vx);

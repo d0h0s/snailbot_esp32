@@ -562,6 +562,7 @@ void MPU6050_Filter::loop(void)
 
     float mt, m_ratio = 1.0f;
     
+    _mode = BOTH;   // test
     switch (_mode) {
         case FREE:
             MadgwickQuaternionUpdate6(accX, accY, accZ, gyroXrate, gyroYrate, gyroZrate, dt);
